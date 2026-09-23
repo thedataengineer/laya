@@ -155,6 +155,73 @@ perfect = selective_threshold(np.full(500, 0.99), np.ones(500, dtype=bool), 0.05
 check("walk/perfect record keeps everything", perfect["coverage"], 1.0)
 check("walk/perfect record sits at grid floor", perfect["threshold"], 0.0)
 
+# ------------------------------------------------------------------ cost control
+# Fixed-sequence testing rejects a whole prefix of the grid at once and controls the
+# family-wise error rate over all of it, so every certified threshold carries the bound
+# simultaneously. That is what makes choosing among them by cost free rather than a second
+# look at the data -- and it is the property these tests pin down.
+cost_free = selective_threshold(scores, correct, alpha=0.05, delta=0.05)
+ok("cost/the walk reports how many thresholds it certified",
+   cost_free["certified_thresholds"] >= 2, str(cost_free.get("certified_thresholds")))
+ok("cost/without costs it still keeps the most permissive",
+   cost_free["threshold"] == selective_threshold(scores, correct, 0.05, 0.05)["threshold"])
+
+cheap_errors = selective_threshold(scores, correct, 0.05, 0.05,
+                                   cost={"error": 2, "abstain": 1})
+dear_errors = selective_threshold(scores, correct, 0.05, 0.05,
+                                  cost={"error": 200, "abstain": 1})
+ok("cost/a dearer mistake buys a stricter threshold",
+   dear_errors["threshold"] >= cheap_errors["threshold"],
+   "%.3f then %.3f" % (cheap_errors["threshold"], dear_errors["threshold"]))
+ok("cost/and therefore less coverage", dear_errors["coverage"] <= cheap_errors["coverage"])
+for name, fit in (("cheap", cheap_errors), ("dear", dear_errors)):
+    ok("cost/%s still honours the risk budget" % name, fit["risk_bound"] <= 0.05)
+    ok("cost/%s is still certifiable" % name, fit["certifiable"] is True)
+    ok("cost/%s reports it found the cheapest certified point" % name,
+       fit["cost"]["is_cheapest_certified"] is True)
+
+# The chosen point must actually be the cheapest, not merely a cheap-looking one.
+def expected_cost(tau, ce, ca):
+    acc = scores >= tau
+    return ce * float((acc & ~correct).mean()) + ca * float((~acc).mean())
+
+
+for ce, ca in ((2, 1), (20, 1), (200, 1), (1, 3)):
+    fit = selective_threshold(scores, correct, 0.05, 0.05, cost={"error": ce, "abstain": ca})
+    mine = expected_cost(fit["threshold"], ce, ca)
+    # every threshold the walk certified, recomputed from scratch
+    all_taus = [t for t in np.arange(0.0, 1.0001, 0.005)
+                if binomial_upper_bound(int(((scores >= t) & ~correct).sum()),
+                                        scores.size, 0.05) <= 0.05]
+    best = min(expected_cost(t, ce, ca) for t in all_taus)
+    ok("cost/%d:%d picks the cheapest certified threshold" % (ce, ca), abs(mine - best) < 1e-12,
+       "chose %.5f, best %.5f" % (mine, best))
+    ok("cost/%d:%d reports the cost it chose" % (ce, ca),
+       abs(fit["cost"]["expected_cost_per_decision"] - mine) < 1e-12)
+
+k = dear_errors["cost"]
+ok("cost/abstaining everywhere costs the abstain price",
+   abs(k["cost_if_abstain_everything"] - 1.0) < 1e-12)
+ok("cost/accepting everywhere is priced from base accuracy",
+   abs(k["cost_if_accept_everything"] - 200 * float((~correct).mean())) < 1e-9)
+ok("cost/savings are stated against both trivial policies",
+   abs(k["saving_vs_abstain_everything"]
+       - (k["cost_if_abstain_everything"] - k["expected_cost_per_decision"])) < 1e-12)
+ok("cost/accept-everything is labelled as not endorsed", "not as an option" in k["note"])
+ok("cost/a correct decision can carry a price too",
+   selective_threshold(scores, correct, 0.05, 0.05,
+                       cost={"error": 10, "abstain": 1, "correct": 0.5}
+                       )["cost"]["unit_costs"]["correct"] == 0.5)
+
+raises("cost/rejects an unknown key",
+       lambda: selective_threshold(scores, correct, 0.05, cost={"nope": 1}), "unknown cost keys")
+raises("cost/rejects a negative price",
+       lambda: selective_threshold(scores, correct, 0.05, cost={"error": -1, "abstain": 1}),
+       "non-negative")
+raises("cost/rejects an all-zero spec",
+       lambda: selective_threshold(scores, correct, 0.05, cost={"error": 0, "abstain": 0}),
+       "must be positive")
+
 # ------------------------------------------------------------------ selective validity
 # The contract is P(true joint risk > alpha) <= delta. Labels here are drawn from the
 # model's own probabilities, so true risk at a threshold is a population quantity with no
@@ -197,6 +264,22 @@ few_s, few_y = draw_miss(200, 23, prevalence=0.05)
 few = miss_threshold(few_s, few_y, alpha=0.01, delta=0.05)
 ok("miss/uncertifiable blocks everything",
    few["certifiable"] is False and few["threshold"] == 0.0 and few["block_rate"] == 1.0)
+
+# miss gates trade a miss against a wrongly blocked benign item
+m_cheap = miss_threshold(ms, my, 0.05, 0.05, cost={"miss": 10, "block": 1})
+m_dear = miss_threshold(ms, my, 0.05, 0.05, cost={"miss": 5000, "block": 1})
+ok("cost/a dearer miss blocks more", m_dear["block_rate"] >= m_cheap["block_rate"],
+   "%.3f then %.3f" % (m_cheap["block_rate"], m_dear["block_rate"]))
+ok("cost/miss threshold moves down as misses get dearer",
+   m_dear["threshold"] <= m_cheap["threshold"])
+ok("cost/miss still honours its budget", m_dear["risk_bound"] <= 0.05)
+ok("cost/miss reports prevalence it priced against",
+   abs(m_dear["cost"]["prevalence"] - float(my.mean())) < 1e-12)
+ok("cost/blocking nothing is priced from prevalence",
+   abs(m_dear["cost"]["cost_if_block_nothing"] - 5000 * float(my.mean())) < 1e-9)
+raises("cost/miss rejects selective-shaped keys",
+       lambda: miss_threshold(ms, my, 0.05, cost={"error": 1, "abstain": 1}),
+       "miss against block")
 
 # ------------------------------------------------------------------ conformal quantile
 q, feasible = conformal_quantile(np.linspace(0, 1, 1000), 0.1)

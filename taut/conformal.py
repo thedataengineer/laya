@@ -181,8 +181,64 @@ def _sketch(scores: np.ndarray) -> Dict[str, Any]:
     }
 
 
+def _cost_weights(cost: Optional[Mapping[str, float]]) -> Optional[Dict[str, float]]:
+    """Validate an operating-cost spec. Returns None when no costs were given."""
+    if cost is None:
+        return None
+    unknown = set(cost) - {"error", "abstain", "correct"}
+    if unknown:
+        raise ValueError("unknown cost keys %s; expected error, abstain, correct"
+                         % sorted(unknown))
+    out = {"error": float(cost.get("error", 0.0)),
+           "abstain": float(cost.get("abstain", 0.0)),
+           "correct": float(cost.get("correct", 0.0))}
+    if any(v < 0 for v in out.values()):
+        raise ValueError("costs must be non-negative; got %r" % (dict(cost),))
+    if out["error"] <= 0 and out["abstain"] <= 0:
+        raise ValueError("at least one of cost['error'] or cost['abstain'] must be "
+                         "positive, or every threshold costs the same and the choice is "
+                         "meaningless")
+    return out
+
+
+def _expected_cost(candidate: Mapping[str, Any], unit: Mapping[str, float]) -> float:
+    """Expected cost per incoming decision at one certified operating point."""
+    joint = float(candidate["empirical_joint_risk"])
+    coverage = float(candidate["coverage"])
+    return (unit["error"] * joint
+            + unit["abstain"] * (1.0 - coverage)
+            + unit["correct"] * (coverage - joint))
+
+
+def _cost_report(best: Mapping[str, Any], certified: Sequence[Mapping[str, Any]],
+                 unit: Mapping[str, float], correct: np.ndarray) -> Dict[str, Any]:
+    """What the chosen operating point costs, against the two trivial policies.
+
+    ``accept_everything`` is reported even though it usually breaks the risk budget: a
+    caller comparing against it can see exactly what the guarantee is costing them, which
+    is a fairer thing to show than only the options that happen to be allowed.
+    """
+    base_error = float((~np.asarray(correct, dtype=bool)).mean())
+    chosen = _expected_cost(best, unit)
+    accept_all = unit["error"] * base_error + unit["correct"] * (1.0 - base_error)
+    abstain_all = unit["abstain"]
+    cheapest_certified = min(_expected_cost(c, unit) for c in certified)
+    return {
+        "unit_costs": dict(unit),
+        "expected_cost_per_decision": chosen,
+        "cost_if_abstain_everything": abstain_all,
+        "cost_if_accept_everything": accept_all,
+        "saving_vs_abstain_everything": abstain_all - chosen,
+        "saving_vs_accept_everything": accept_all - chosen,
+        "is_cheapest_certified": abs(chosen - cheapest_certified) < 1e-12,
+        "note": ("accept_everything ignores the risk budget; it is shown so the price of "
+                 "the guarantee is visible, not as an option the gate endorses"),
+    }
+
+
 def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
-                        delta: float = 0.05) -> Dict[str, Any]:
+                        delta: float = 0.05,
+                        cost: Optional[Mapping[str, float]] = None) -> Dict[str, Any]:
     """Lowest threshold whose accepted-and-wrong rate is provably at most ``alpha``.
 
     The certified quantity is the *joint* loss -- a decision that is both accepted and
@@ -204,11 +260,31 @@ def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
     point can recover, and stopping at the first failure over a pre-specified sequence
     holds the family-wise error rate at ``delta`` with no multiplicity correction.
 
+    Passing ``cost`` changes *which* certified threshold is returned, never whether the
+    guarantee holds. Fixed-sequence testing rejects a whole prefix of the grid at once and
+    controls the family-wise error rate over all of it, so every threshold in the certified
+    set carries the bound simultaneously -- and any one of them may be picked by any
+    criterion without spending more of ``delta``. The default picks the most permissive,
+    which maximises coverage. With costs it picks the cheapest instead:
+
+        expected cost per decision
+            = cost["error"]   * P(accepted and wrong)
+            + cost["abstain"] * P(abstained)
+            + cost["correct"] * P(accepted and right)
+
+    which is the question an operations owner is actually asking -- "what does this risk
+    budget cost me, and where is it cheapest to sit?" -- rather than "how much traffic can
+    I keep?". ``cost["correct"]`` defaults to 0 and is there for the case where an
+    auto-handled decision is not free.
+
     Args:
         scores: Confidence per calibration decision, higher meaning more confident.
         correct: Whether each decision was right.
         alpha: The share of all decisions allowed to be accepted and wrong.
         delta: Confidence on the bound. 0.05 means it holds 95% of the time.
+        cost: Optional ``{"error": ..., "abstain": ..., "correct": ...}`` in any single
+            currency or time unit. When given, the cheapest certified threshold is
+            returned instead of the most permissive, with a ``cost`` block alongside.
 
     Returns:
         The threshold and what it bought: coverage, the certified bound, the observed
@@ -227,6 +303,8 @@ def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
         raise ValueError("selective calibration needs at least one scored decision")
 
     wrong = ~correct
+    unit = _cost_weights(cost)
+    certified: List[Dict[str, Any]] = []
     best: Optional[Dict[str, Any]] = None
     tested = 0
 
@@ -239,7 +317,7 @@ def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
         tested += 1
         if bound <= alpha:
             n_acc = int(accepted.sum())
-            best = {
+            certified.append({
                 "threshold": float(tau),
                 "coverage": n_acc / n,
                 "empirical_joint_risk": n_bad / n,
@@ -247,9 +325,15 @@ def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
                 "risk_bound": bound,
                 "n_accepted": n_acc,
                 "n_errors": n_bad,
-            }
+            })
         else:
             break
+
+    if certified:
+        # The whole certified prefix is rejected simultaneously under family-wise control,
+        # so any member carries the bound and the choice between them is free.
+        best = (min(certified, key=lambda c: _expected_cost(c, unit))
+                if unit is not None else certified[-1])
 
     if best is None:
         floor = min_calibration_size(alpha, delta)
@@ -275,11 +359,31 @@ def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
         }
     best["certifiable"] = True
     best["candidates_tested"] = tested
+    best["certified_thresholds"] = len(certified)
+    if unit is not None:
+        best["cost"] = _cost_report(best, certified, unit, correct)
     return best
 
 
+def _miss_cost_weights(cost: Optional[Mapping[str, float]]) -> Optional[Dict[str, float]]:
+    """Validate a guardrail cost spec: what a miss costs against a wrongly blocked item."""
+    if cost is None:
+        return None
+    unknown = set(cost) - {"miss", "block"}
+    if unknown:
+        raise ValueError("unknown cost keys %s; a miss gate trades miss against block"
+                         % sorted(unknown))
+    out = {"miss": float(cost.get("miss", 0.0)), "block": float(cost.get("block", 0.0))}
+    if any(v < 0 for v in out.values()):
+        raise ValueError("costs must be non-negative; got %r" % (dict(cost),))
+    if out["miss"] <= 0 and out["block"] <= 0:
+        raise ValueError("at least one of cost['miss'] or cost['block'] must be positive")
+    return out
+
+
 def miss_threshold(scores: np.ndarray, positive: np.ndarray, alpha: float,
-                   delta: float = 0.05) -> Dict[str, Any]:
+                   delta: float = 0.05,
+                   cost: Optional[Mapping[str, float]] = None) -> Dict[str, Any]:
     """Most permissive block threshold whose false-negative rate is at most ``alpha``.
 
     ``scores`` is P(true) from a ``noul`` question, ``positive`` the gold label.
@@ -296,6 +400,13 @@ def miss_threshold(scores: np.ndarray, positive: np.ndarray, alpha: float,
     guarantee reads "of future unsafe items, at most ``alpha`` pass". It says nothing
     about how much benign traffic is blocked -- read ``block_rate`` for that cost, and
     raise ``alpha`` if it is too high to run.
+
+    ``cost`` picks the cheapest certified threshold rather than the most permissive, on the
+    same reasoning as :func:`selective_threshold`: fixed-sequence testing certifies the
+    whole prefix at once, so choosing within it is free. Here the trade is explicit --
+    ``cost["miss"]`` per unsafe item that gets through against ``cost["block"]`` per benign
+    item wrongly blocked -- and prevalence comes from the calibration split, so the answer
+    is in the units a guardrail owner argues about rather than in rates.
     """
     scores = np.asarray(scores, dtype=np.float64).ravel()
     positive = np.asarray(positive, dtype=bool).ravel()
@@ -308,13 +419,15 @@ def miss_threshold(scores: np.ndarray, positive: np.ndarray, alpha: float,
         raise ValueError("miss control needs at least one positive example in the "
                          "calibration set; none of the %d labels were true" % n)
 
+    unit = _miss_cost_weights(cost)
+    certified: List[Dict[str, Any]] = []
     best: Optional[Dict[str, Any]] = None
     for tau in _GRID:
         blocked = scores >= tau
         n_missed = int((positive & ~blocked).sum())
         bound = binomial_upper_bound(n_missed, n_pos, delta)
         if bound <= alpha:
-            best = {
+            certified.append({
                 "threshold": float(tau),
                 "block_rate": float(blocked.mean()),
                 "empirical_miss_rate": n_missed / n_pos,
@@ -322,9 +435,16 @@ def miss_threshold(scores: np.ndarray, positive: np.ndarray, alpha: float,
                 "n_positive": n_pos,
                 "n_missed": n_missed,
                 "n_calibration": n,
-            }
+                "false_block_rate": float((blocked & ~positive).sum()) / n,
+                "miss_share": n_missed / n,
+            })
         else:
             break
+
+    if certified:
+        best = (min(certified, key=lambda c: unit["miss"] * c["miss_share"]
+                                             + unit["block"] * c["false_block_rate"])
+                if unit is not None else certified[-1])
 
     if best is None:
         return {
@@ -338,6 +458,19 @@ def miss_threshold(scores: np.ndarray, positive: np.ndarray, alpha: float,
             "certifiable": False,
         }
     best["certifiable"] = True
+    best["certified_thresholds"] = len(certified)
+    if unit is not None:
+        chosen = unit["miss"] * best["miss_share"] + unit["block"] * best["false_block_rate"]
+        prevalence = n_pos / n
+        best["cost"] = {
+            "unit_costs": dict(unit),
+            "expected_cost_per_item": chosen,
+            "cost_if_block_everything": unit["block"] * (1.0 - prevalence),
+            "cost_if_block_nothing": unit["miss"] * prevalence,
+            "prevalence": prevalence,
+            "note": ("block_nothing ignores the guarantee entirely; it is shown so the "
+                     "price of the guardrail is visible, not as an option the gate endorses"),
+        }
     return best
 
 
@@ -496,12 +629,13 @@ class QuestionGate:
     @classmethod
     def fit(cls, qid: str, qtype: str, options: Sequence[str], probs: np.ndarray,
             gold: np.ndarray, mode: str, alpha: float, delta: float,
-            set_method: str = "lac") -> "QuestionGate":
+            set_method: str = "lac",
+            cost: Optional[Mapping[str, float]] = None) -> "QuestionGate":
         n = int(probs.shape[0])
         if mode == "selective":
             scores = probs.max(axis=1)
             correct = probs.argmax(axis=1) == gold
-            fit = selective_threshold(scores, correct, alpha, delta)
+            fit = selective_threshold(scores, correct, alpha, delta, cost=cost)
             diagnostics = {
                 "n_calibration": n,
                 "coverage": fit["coverage"],
@@ -513,6 +647,8 @@ class QuestionGate:
                 "min_calibration": min_calibration_size(alpha, delta),
                 "score_sketch": _sketch(scores),
             }
+            if "cost" in fit:
+                diagnostics["cost"] = fit["cost"]
             if not fit["certifiable"]:
                 diagnostics["shortfall"] = fit["shortfall"]
             params = {"threshold": fit["threshold"]}
@@ -520,7 +656,7 @@ class QuestionGate:
         elif mode == "miss":
             if qtype != "noul":
                 raise ValueError("miss control applies to noul questions; %r is %s" % (qid, qtype))
-            fit = miss_threshold(probs[:, 1], gold == 1, alpha, delta)
+            fit = miss_threshold(probs[:, 1], gold == 1, alpha, delta, cost=cost)
             diagnostics = {
                 "n_calibration": n,
                 "block_rate": fit["block_rate"],
@@ -530,9 +666,15 @@ class QuestionGate:
                 "certifiable": fit["certifiable"],
                 "score_sketch": _sketch(probs[:, 1]),
             }
+            if "cost" in fit:
+                diagnostics["cost"] = fit["cost"]
             params = {"threshold": fit["threshold"]}
 
         elif mode == "set":
+            if cost is not None:
+                raise ValueError("cost applies to selective and miss gates, which choose "
+                                 "between certified thresholds; a set gate has no such "
+                                 "choice to price (question %r)" % (qid,))
             nonconf = _set_scores(probs, gold, set_method)
             qhat, feasible = conformal_quantile(nonconf, alpha)
             sizes = _set_sizes(probs, qhat, set_method)
@@ -549,6 +691,10 @@ class QuestionGate:
             params = {"qhat": qhat, "method": set_method}
 
         elif mode == "interval":
+            if cost is not None:
+                raise ValueError("cost applies to selective and miss gates, which choose "
+                                 "between certified thresholds; an interval gate has no "
+                                 "such choice to price (question %r)" % (qid,))
             if qtype != "score":
                 raise ValueError("interval control applies to score questions; %r is %s"
                                  % (qid, qtype))
@@ -791,7 +937,9 @@ class ConformalGate:
                   delta: float = 0.05,
                   mode: Union[str, Mapping[str, str]] = "auto",
                   set_method: str = "lac",
-                  questions: Optional[Iterable[str]] = None) -> "ConformalGate":
+                  questions: Optional[Iterable[str]] = None,
+                  cost: Optional[Union[Mapping[str, float],
+                                       Mapping[str, Mapping[str, float]]]] = None) -> "ConformalGate":
         """Fit a gate from model outputs and gold labels.
 
         Args:
@@ -811,6 +959,12 @@ class ConformalGate:
                 on hard inputs at the cost of larger ones.
             questions: Restrict fitting to these ids. Defaults to every id that appears
                 in both ``results`` and ``labels``.
+            cost: Operating costs, so the gate returns the *cheapest* certified threshold
+                rather than the most permissive. One mapping applied to every question, or
+                a per-question mapping of id to costs. ``selective`` gates take
+                ``{"error", "abstain", "correct"}``; ``miss`` gates take
+                ``{"miss", "block"}``. The guarantee is unaffected either way -- the whole
+                certified prefix is valid simultaneously, so choosing within it is free.
 
         Raises:
             ValueError: if the two sequences differ in length, or a requested question
@@ -848,8 +1002,24 @@ class ConformalGate:
             qmode = mode.get(qid, "auto") if isinstance(mode, Mapping) else mode
             if qmode == "auto":
                 qmode = "interval" if qtype == "score" else "selective"
+            per_question = isinstance(cost, Mapping) and any(
+                isinstance(v, Mapping) for v in cost.values())
+            if per_question:
+                qcost, named = cost.get(qid), qid in cost
+            else:
+                qcost, named = cost, False
+            if qcost is not None and qmode not in ("selective", "miss"):
+                if named:
+                    # Costs asked for by name on a mode that cannot spend them is a
+                    # mistake worth surfacing; silently dropping it would leave the caller
+                    # believing a gate was priced when it was not.
+                    raise ValueError(
+                        "cost was given for question %r, which is a %s gate; only "
+                        "selective and miss gates choose between certified thresholds and "
+                        "so have a cost to minimise" % (qid, qmode))
+                qcost = None          # a blanket spec simply does not apply here
             fitted[qid] = QuestionGate.fit(qid, qtype, options, probs, gold,
-                                           qmode, alpha, delta, set_method)
+                                           qmode, alpha, delta, set_method, cost=qcost)
 
         meta = {
             "schema_version": _SCHEMA_VERSION,
@@ -981,10 +1151,16 @@ class ConformalGate:
                 op = "keep %.1f%% @ tau=%.3f" % (100.0 * float(d.get("coverage", 0.0)),
                                                  float(gate.params["threshold"]))
                 guar = "accepted-and-wrong <= %.3g of all" % gate.alpha
+                if "cost" in d:
+                    guar += "  [%.4g/decision, saves %.4g vs escalating all]" % (
+                        d["cost"]["expected_cost_per_decision"],
+                        d["cost"]["saving_vs_abstain_everything"])
             elif gate.mode == "miss":
                 op = "block %.1f%% @ tau=%.3f" % (100.0 * float(d.get("block_rate", 0.0)),
                                                   float(gate.params["threshold"]))
                 guar = "miss <= %.3g of positives" % gate.alpha
+                if "cost" in d:
+                    guar += "  [%.4g/item]" % d["cost"]["expected_cost_per_item"]
             elif gate.mode == "set":
                 op = "set size %.2f, %.0f%% single" % (float(d.get("mean_set_size", 0.0)),
                                                        100.0 * float(d.get("singleton_rate", 0.0)))

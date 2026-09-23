@@ -169,6 +169,144 @@ open(bad, "w", encoding="utf-8").write("{not json")
 code, out, err, stub = run_cli(["--predict", "--gate", bad, "hi"])
 check("gate: malformed JSON exits 2 rather than raising", code == 2, "got %r" % code)
 
+# --------------------------------------------------------------------- taut calibrate
+# Fitting a gate from labelled JSONL must not need a checkpoint when the rows already
+# carry model output, which is the path a user reusing predictions across risk budgets
+# takes -- and the only one testable without weights.
+
+
+def _write_jsonl(rows):
+    path = os.path.join(tempfile.mkdtemp(), "data.jsonl")
+    with open(path, "w", encoding="utf-8") as fh:
+        for r in rows:
+            fh.write(_json.dumps(r) + "\n")
+    return path
+
+
+def _labelled_rows(n=1500, seed=7):
+    keys = ["billing", "technical", "account", "other"]
+    r = np.random.default_rng(seed)
+    rows = []
+    for _ in range(n):
+        g = int(r.integers(0, 4))
+        lg = r.normal(0, 1, 4)
+        lg[g] += 2.2
+        e = np.exp(lg - lg.max())
+        p = e / e.sum()
+        unsafe = bool(r.random() < 0.25)
+        pt = float(r.beta(6, 2) if unsafe else r.beta(2, 6))
+        rows.append({"answers": {
+            "intent": {"type": "choice", "choice": keys[int(p.argmax())],
+                       "probabilities": {k: float(v) for k, v in zip(keys, p)},
+                       "confidence": float(p.max())},
+            "unsafe": {"type": "noul", "noul": pt, "confidence": max(pt, 1 - pt)}},
+            "labels": {"intent": keys[g], "unsafe": unsafe}})
+    return rows
+
+
+def run_calibrate(argv):
+    out, err = io.StringIO(), io.StringIO()
+    with redirect_stdout(out), redirect_stderr(err):
+        code = cli.main(["calibrate"] + argv)
+    return code, out.getvalue(), err.getvalue()
+
+
+DATA = _write_jsonl(_labelled_rows())
+GATE_OUT = os.path.join(tempfile.mkdtemp(), "fitted.json")
+
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT, "--alpha", "0.05",
+                               "--mode", "intent=selective,unsafe=miss"])
+check("calibrate: exit code", code == 0, "%r %s" % (code, err))
+check("calibrate: needs no checkpoint for precomputed rows", "could not run the model" not in err)
+check("calibrate: writes the gate", os.path.exists(GATE_OUT))
+check("calibrate: prints the fitted report", "accepted-and-wrong" in out, out[:300])
+check("calibrate: applies the per-question modes", "miss <=" in out, out[:400])
+check("calibrate: holds data out and measures it", "Held-out check" in out, out[:600])
+check("calibrate: scores a miss gate on its own terms",
+      "of positives missed" in out, out)
+check("calibrate: warns that one sample is one draw", "noise, not a breach" in out)
+check("calibrate: tells you how to apply it", "--gate " + GATE_OUT in out, out[-300:])
+
+loaded = ConformalGate.load(GATE_OUT)
+check("calibrate: the gate loads back", sorted(loaded.gates) == ["intent", "unsafe"])
+check("calibrate: fitted on the split, not everything",
+      loaded.meta["n_calibration"] == 750, loaded.meta.get("n_calibration"))
+
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT + "2", "--split", "1.0"])
+check("calibrate: --split 1.0 fits on everything", code == 0, err)
+check("calibrate: and says nothing was held back", "nothing is held back" in out, out[-400:])
+check("calibrate: auto mode picks per question type", "selective" in out)
+
+# costs reach the fit, and change the operating point
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT + "3", "--alpha", "0.05",
+                                "--mode", "intent=selective,unsafe=miss",
+                                "--cost", "intent:error=40,abstain=1",
+                                "--cost", "unsafe:miss=800,block=1"])
+check("calibrate: --cost is accepted", code == 0, err)
+check("calibrate: --cost is priced into the report", "/decision, saves" in out, out[:500])
+priced = ConformalGate.load(GATE_OUT + "3")
+check("calibrate: --cost tightens the threshold",
+      priced["intent"].params["threshold"] > loaded["intent"].params["threshold"],
+      "%r vs %r" % (priced["intent"].params["threshold"], loaded["intent"].params["threshold"]))
+check("calibrate: --cost survives into the saved gate",
+      "cost" in priced["intent"].diagnostics)
+
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT + "4", "--cost", "error=40,abstain=1"])
+check("calibrate: a blanket --cost works too", code == 0, err)
+
+code, out, err = run_calibrate([DATA, "--quiet", "-o", GATE_OUT + "5"])
+check("calibrate: --quiet writes but prints nothing", code == 0 and out.strip() == "", out)
+check("calibrate: --quiet still wrote the gate", os.path.exists(GATE_OUT + "5"))
+
+# failure paths, each with a message naming the fix
+bad = _write_jsonl([{"answers": {}}])
+code, out, err = run_calibrate([bad, "-o", GATE_OUT + "6"])
+check("calibrate: a row without labels is refused", code == 2)
+check("calibrate: and says which line", "line 1" in err and "labels" in err, err)
+
+nolabels = os.path.join(tempfile.mkdtemp(), "broken.jsonl")
+open(nolabels, "w", encoding="utf-8").write("{not json\n")
+code, out, err = run_calibrate([nolabels, "-o", GATE_OUT + "7"])
+check("calibrate: malformed JSON is refused", code == 2)
+check("calibrate: and points at the line", "line 1" in err, err)
+
+empty = os.path.join(tempfile.mkdtemp(), "empty.jsonl")
+open(empty, "w", encoding="utf-8").write("")
+code, out, err = run_calibrate([empty, "-o", GATE_OUT + "8"])
+check("calibrate: an empty file is refused", code == 2 and "no labelled rows" in err, err)
+
+code, out, err = run_calibrate(["/no/such/data.jsonl", "-o", GATE_OUT + "9"])
+check("calibrate: a missing file exits 2", code == 2)
+
+states_only = _write_jsonl([{"text": "hello", "labels": {"intent": "billing"}}])
+code, out, err = run_calibrate([states_only, "-o", GATE_OUT + "10"])
+check("calibrate: rows without answers need --questions",
+      code == 2 and "--questions is required" in err, err)
+
+mixed = _write_jsonl(_labelled_rows(5) + [{"text": "x", "labels": {"intent": "billing"}}])
+code, out, err = run_calibrate([mixed, "-o", GATE_OUT + "11"])
+check("calibrate: a half-predicted file is refused",
+      code == 2 and "for all rows or none" in err, err)
+
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT + "12", "--split", "0"])
+check("calibrate: --split 0 is refused", code == 2 and "--split must lie" in err, err)
+
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT + "13", "--cost", "error"])
+check("calibrate: a malformed --cost is refused", code == 2 and "key=value" in err, err)
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT + "14", "--cost", "error=lots"])
+check("calibrate: a non-numeric --cost is refused", code == 2 and "not a number" in err, err)
+code, out, err = run_calibrate([DATA, "-o", GATE_OUT + "15",
+                                "--cost", "error=1,abstain=1", "--cost", "intent:error=1"])
+check("calibrate: mixing blanket and per-question costs is refused",
+      code == 2 and "not both" in err, err)
+
+code, out, err = run_calibrate([DATA, "-o", "/no/such/dir/gate.json"])
+check("calibrate: an unwritable output exits 2", code == 2 and "could not write" in err, err)
+
+# the flat CLI still works with a subcommand registered
+code, out, err, stub = run_cli(["charged twice"])
+check("calibrate: the bare CLI is unaffected", code == 0 and "multilingual" in out, out)
+
 # --------------------------------------------------------------------- report
 print("\n%d passed, %d failed" % (len(PASS), len(FAIL)))
 for f in FAIL:

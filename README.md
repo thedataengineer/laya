@@ -600,6 +600,59 @@ $ python -c "import taut, sys; taut.ConformalGate.load('triage_gate.json'); prin
 False
 ```
 
+### Price the guarantee: cost-optimal operating points
+
+A risk budget says what you will not tolerate. It does not say where to sit inside it —
+and "keep as much traffic as possible" is only the right answer when escalation is free.
+
+Give the gate your economics and it returns the *cheapest* certified threshold instead:
+
+```python
+gate = ConformalGate.calibrate(
+    results, labels, alpha=0.05, delta=0.05,
+    cost={"intent": {"error": 40, "abstain": 1},     # a wrong auto-route costs 40x a human look
+          "unsafe": {"miss": 800, "block": 1}},      # a missed unsafe item costs 800x a false block
+)
+```
+
+```
+question               type      mode       operating point          guarantee
+------------------------------------------------------------------------------
+intent                 choice    selective  keep 27.4% @ tau=0.825   accepted-and-wrong <= 0.05 of all  [0.7393/decision, saves 0.2607 vs escalating all]
+unsafe                 noul      miss       block 66.3% @ tau=0.210  miss <= 0.05 of positives  [0.4153/item]
+```
+
+Without costs that first gate keeps 78% of traffic. With a mistake priced at 40× a human
+review, the cheapest certified point keeps 27% — the risk budget allowed the looser
+threshold, but the economics never wanted it.
+
+**The guarantee is unaffected, and that is not a coincidence.** Fixed-sequence testing does
+not certify one threshold; it rejects a whole prefix of the grid at once and controls the
+family-wise error rate over *all* of it. So every certified threshold carries the bound
+simultaneously, and choosing among them by any criterion — cost, coverage, latency — costs
+nothing extra in `delta`. The gate reports `certified_thresholds` so you can see how much
+room there was.
+
+The cost block also prices the two policies you are implicitly choosing against:
+
+```python
+>>> gate["intent"].diagnostics["cost"]
+{'expected_cost_per_decision': 0.739,
+ 'cost_if_abstain_everything': 1.0,        # escalate every ticket
+ 'cost_if_accept_everything': 8.65,        # auto-route everything, no guarantee
+ 'saving_vs_abstain_everything': 0.261,
+ 'is_cheapest_certified': True, ...}
+```
+
+`cost_if_accept_everything` breaks the risk budget by construction. It is reported anyway,
+because a caller deserves to see what the guarantee costs rather than only the options the
+gate is willing to endorse.
+
+`selective` gates take `{"error", "abstain", "correct"}`; `miss` gates take
+`{"miss", "block"}` and price against the prevalence in your calibration split. `set` and
+`interval` gates have no choice between certified thresholds, so naming a cost for one is
+an error rather than a silent no-op.
+
 ### Serve it, or run it from the shell
 
 Point `TAUT_GATE` at a saved gate and `taut-serve` stops being a scorer and becomes a
@@ -627,11 +680,49 @@ its answers and then quietly not doing so is the worst outcome available. Set
 `TAUT_GATE_STRICT=1` to reject requests carrying questions the gate was not calibrated on,
 instead of passing them through wearing no guarantee.
 
-From the shell:
+### Fit a gate without writing Python
 
 ```bash
-taut --gate triage_gate.json --report              # what does this gate certify?
-taut "billed twice" --predict --gate triage_gate.json
+taut calibrate tickets.jsonl -q questions.json -o gate.json --alpha 0.02 \
+     --mode "intent=selective,unsafe=miss" --cost "intent:error=40,abstain=1"
+```
+
+`tickets.jsonl` is one labelled example per line:
+
+```jsonc
+{"text": "I was charged twice", "labels": {"intent": "billing", "unsafe": false}}
+```
+
+A row that already carries model output under `"answers"` is used as-is and no checkpoint
+loads at all — so you can score once and re-fit across risk budgets for free.
+
+By default a random half is held out, the gate is fitted on one half and **measured** on
+the other, and the report carries both:
+
+```
+question               type      mode       operating point          guarantee
+------------------------------------------------------------------------------
+intent                 choice    selective  keep 77.4% @ tau=0.530   accepted-and-wrong <= 0.05 of all
+unsafe                 noul      miss       block 30.2% @ tau=0.455  miss <= 0.05 of positives
+
+Held-out check  n=1000
+
+question               mode       observed                 against
+------------------------------------------------------------------
+intent                 selective  4.40% accepted+wrong     budget 0.05  (kept 77.2%)
+unsafe                 miss       2.07% of positives missed budget 0.05  (blocked 31.4%)
+
+  One held-out sample is one draw: landing a little over the budget is noise, not a breach.
+```
+
+A gate reported only on the data it was fitted to is a promise. The held-out table is the
+evidence, and it is printed by default rather than hidden behind a flag.
+
+And to apply one:
+
+```bash
+taut --gate gate.json --report                     # what does this gate certify?
+taut "billed twice" --predict --gate gate.json
 ```
 
 ```
