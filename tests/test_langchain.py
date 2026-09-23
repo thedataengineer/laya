@@ -10,6 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from taut.integrations.langchain import (
     TautEvaluator,
+    TautGate,
+    TautGateEscalation,
     TautGuardrail,
     TautGuardrailError,
     TautRouter,
@@ -221,6 +223,157 @@ eval_res = evaluator.evaluate_strings(
 )
 check("evaluator/faithfulness", eval_res["faithfulness"]["noul"], 0.98)
 check("evaluator/hallucination", eval_res["hallucination"]["noul"], 0.02)
+
+
+# --------------------------------------------------------------- TautGate
+# The other runnables return a score and leave the threshold to the caller. This one
+# carries a fitted risk bound, so a graph can branch on "inside the budget I signed off".
+import tempfile  # noqa: E402
+
+import numpy as np  # noqa: E402
+
+from taut.conformal import ConformalGate  # noqa: E402
+
+GKEYS = ["billing", "technical", "account", "other"]
+
+
+def _softmax(x):
+    e = np.exp(x - x.max())
+    return e / e.sum()
+
+
+def _gate_rows(n=3000, seed=0, margin=2.2):
+    r = np.random.default_rng(seed)
+    results, labels = [], []
+    for _ in range(n):
+        g = int(r.integers(0, 4))
+        lg = r.normal(0, 1, 4)
+        lg[g] += margin
+        p = _softmax(lg)
+        results.append({"answers": {"intent": {
+            "type": "choice", "choice": GKEYS[int(p.argmax())],
+            "probabilities": {k: float(v) for k, v in zip(GKEYS, p)},
+            "confidence": float(p.max())}}})
+        labels.append({"intent": GKEYS[g]})
+    return results, labels
+
+
+GROWS, GLABELS = _gate_rows()
+FITTED = ConformalGate.calibrate(GROWS, GLABELS, alpha=0.05, delta=0.05)
+GATE_PATH = os.path.join(tempfile.mkdtemp(), "gate.json")
+FITTED.save(GATE_PATH)
+
+# A gate can arrive three ways; a graph committed next to a gate.json needs the path form.
+for label, spec in (("object", FITTED), ("path", GATE_PATH), ("dict", FITTED.to_dict())):
+    check_true("gate/accepts a gate as a %s" % label,
+               len(TautGate(gate=spec).gate) == 1)
+
+annotated = TautGate(gate=GATE_PATH).invoke(dict(GROWS[0]))
+check_true("gate/annotate keeps the answers", "answers" in annotated)
+check_true("gate/annotate attaches per-question blocks",
+           "gate" in annotated["answers"]["intent"])
+check_true("gate/annotate attaches a verdict", "taut_gate" in annotated)
+check("gate/verdict names the policy", annotated["taut_gate"]["accept_when"], "all")
+check_true("gate/verdict carries the union bound over questions",
+           "family_alpha" in annotated["taut_gate"])
+check_true("gate/does not mutate the input state", "taut_gate" not in GROWS[0])
+
+# A pre-scored state must not be scored again -- an upstream node or taut-serve already paid.
+scored_twice = TautGate(gate=FITTED, agent=MockTautAgent(lambda s, q: 1 / 0))
+check_true("gate/reuses an existing answers block instead of predicting",
+           scored_twice.invoke(dict(GROWS[0]))["taut_gate"]["accepted"] in (True, False))
+
+# route: a conditional edge wants a branch name, not a payload.
+router_gate = TautGate(gate=FITTED, action="route")
+branches = [router_gate.invoke(dict(r)) for r in GROWS[:400]]
+check_true("gate/route returns branch names", set(branches) <= {"accept", "escalate"})
+check_true("gate/route actually splits the traffic",
+           0 < branches.count("escalate") < 400, str(branches.count("escalate")))
+check_true("gate/route agrees with the gate block",
+           all((b == "accept") == FITTED.accepts(r, "intent")
+               for b, r in zip(branches[:50], GROWS[:50])))
+
+# raise: for a node that should hand off rather than branch.
+raiser = TautGate(gate=FITTED, action="raise")
+raised = None
+for r in GROWS[:400]:
+    try:
+        raiser.invoke(dict(r))
+    except TautGateEscalation as exc:
+        raised = exc
+        break
+check_true("gate/raise escalates an abstained decision", raised is not None)
+check_true("gate/the error names the question", raised is not None and "intent" in str(raised))
+check_true("gate/the error carries the block that refused",
+           raised is not None and "intent" in raised.abstained)
+check_true("gate/the error carries the whole decision",
+           raised is not None and "answers" in raised.raw_decision)
+check_true("gate/raise passes an accepted decision through",
+           any(isinstance(raiser.invoke(dict(r)), dict) for r in GROWS[:5]
+               if FITTED.accepts(r, "intent")))
+
+# accept_when changes what a record-level accept means.
+two = ConformalGate.calibrate(
+    [{"answers": dict(r["answers"], other=r["answers"]["intent"])} for r in GROWS],
+    [{"intent": l["intent"], "other": l["intent"]} for l in GLABELS],
+    alpha=0.05, delta=0.05)
+strict = TautGate(gate=two, accept_when="all")
+loose = TautGate(gate=two, accept_when="any")
+check_true("gate/accept_when is recorded",
+           loose.invoke({"answers": dict(GROWS[0]["answers"],
+                                         other=GROWS[0]["answers"]["intent"])}
+                        )["taut_gate"]["accept_when"] == "any")
+check_true("gate/family_alpha unions over gated questions",
+           abs(strict.invoke({"answers": dict(GROWS[0]["answers"],
+                                              other=GROWS[0]["answers"]["intent"])}
+                             )["taut_gate"]["family_alpha"] - 0.10) < 1e-12)
+
+# monitoring: a long-running graph should be able to ask whether its gate expired.
+watched = TautGate(gate=FITTED, monitor=True)
+for r in GROWS[:600]:
+    watched.invoke(dict(r))
+check("gate/monitor stays quiet on matching traffic", watched.drift()["status"], "ok")
+drifted_rows, _ = _gate_rows(600, seed=9, margin=0.8)
+shifted = TautGate(gate=FITTED, monitor=True)
+for r in drifted_rows:
+    shifted.invoke(dict(r))
+check("gate/monitor notices shifted traffic", shifted.drift()["status"], "expired")
+
+check_true("gate/report states what is certified",
+           "accepted-and-wrong" in TautGate(gate=FITTED).report())
+
+# A non-dict input still comes back with the verdict attached.
+plain = TautGate(gate=FITTED, questions={"intent": {"type": "choice", "criteria": {}}},
+                 agent=MockTautAgent(lambda s, q: GROWS[0]))
+plain_out = plain.invoke("I was charged twice")
+check_true("gate/a bare string input yields a verdict dict", "taut_gate" in plain_out)
+check_true("gate/and keeps the original input", plain_out["input"] == "I was charged twice")
+
+# Guards: every one of these is a mistake that would otherwise fail later and vaguer.
+for label, kwargs, exc in (
+    ("no gate", {}, ValueError),
+    ("a gate of the wrong type", {"gate": 42}, TypeError),
+    ("an unknown action", {"gate": FITTED, "action": "nope"}, ValueError),
+    ("an unknown accept_when", {"gate": FITTED, "accept_when": "some"}, ValueError),
+):
+    try:
+        TautGate(**kwargs)
+        FAIL.append("gate/rejects %s: did not raise" % label)
+    except exc:
+        PASS.append("gate/rejects %s" % label)
+
+try:
+    TautGate(gate=FITTED).invoke("raw text, never scored")
+    FAIL.append("gate/unscored input without questions: did not raise")
+except ValueError as exc:
+    check_true("gate/unscored input without questions says what is missing",
+               "questions" in str(exc))
+
+try:
+    TautGate(gate=FITTED).drift()
+    FAIL.append("gate/drift without monitor: did not raise")
+except ValueError as exc:
+    check_true("gate/drift without monitor points at monitor=True", "monitor=True" in str(exc))
 
 
 # --------------------------------------------------------------- Summary

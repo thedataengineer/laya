@@ -36,6 +36,8 @@ _LAZY_ATTRS = {
     "TautGuardrailError": (".integrations", "TautGuardrailError"),
     "TautTriage": (".integrations", "TautTriage"),
     "TautEvaluator": (".integrations", "TautEvaluator"),
+    "TautGate": (".integrations", "TautGate"),
+    "TautGateEscalation": (".integrations", "TautGateEscalation"),
     # Risk control is pure NumPy -- lazy only so `import taut` stays cheap, not because
     # it needs torch. A gate can be fitted, saved and applied with torch absent.
     "ConformalGate": (".conformal", "ConformalGate"),
@@ -96,6 +98,8 @@ __all__ = [
     "TautGuardrailError",
     "TautTriage",
     "TautEvaluator",
+    "TautGate",
+    "TautGateEscalation",
     "ConformalGate",
     "QuestionGate",
     "selective_threshold",

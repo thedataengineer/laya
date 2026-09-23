@@ -512,3 +512,205 @@ class TautEvaluator(RunnableSerializable):
 
     def __call__(self, state: Any) -> Dict[str, Any]:
         return self.invoke(state)
+
+
+class TautGateEscalation(ValueError):
+    """Raised when a gated decision does not clear its certified threshold.
+
+    Carries the gate block that refused, so a handler can log *why* the guarantee
+    declined to cover this decision rather than only that it did.
+    """
+
+    def __init__(self, message: str, abstained: Dict[str, Any], raw_decision: Dict[str, Any]):
+        super().__init__(message)
+        self.abstained = abstained
+        self.raw_decision = raw_decision
+
+
+class TautGate(RunnableSerializable):
+    """Put a certified risk bound on a decision inside a LangChain or LangGraph app.
+
+    The other runnables here return a score and leave the threshold to you.
+    ``TautGate`` carries a :class:`~taut.conformal.ConformalGate` fitted to a risk budget,
+    so a node can act on "this decision is inside the 2% error budget I signed off" rather
+    than on a number somebody picked. The gate is JSON and holds no weights, so it can be
+    committed next to the graph and reviewed as a diff.
+
+    Three actions, matching how graphs actually branch:
+
+    ``annotate`` (default)
+        Attach the per-question gate blocks and a summary to the state and pass it on.
+    ``route``
+        Return ``"accept"`` or ``"escalate"``, for use directly as a conditional edge.
+    ``raise``
+        Raise :class:`TautGateEscalation` when any gated answer abstains.
+
+    ``accept_when`` decides what a record-level accept means: ``"all"`` (default, every
+    gated question must clear) or ``"any"``. Read ``family_alpha`` in the output rather
+    than ``alpha``: gating five questions at 2% each risks a record wrong somewhere at up
+    to 10%, and the block says so.
+
+    Set ``monitor=True`` and the runnable keeps a :class:`~taut.drift.GateMonitor` at
+    ``.monitor``, so a long-running graph can be asked whether its gate has expired.
+    """
+
+    gate: Optional[Any] = None
+    questions: Optional[Dict[str, Any]] = None
+    action: str = "annotate"
+    accept_when: str = "all"
+    state_key: Optional[Union[str, Callable[[Any], Any]]] = None
+    output_key: str = "taut_gate"
+    monitor: bool = False
+    agent: Optional[Any] = None
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
+    class Config:
+        arbitrary_types_allowed = True
+        extra = "allow"
+
+    def __init__(
+        self,
+        gate: Optional[Any] = None,
+        questions: Optional[Dict[str, Any]] = None,
+        action: str = "annotate",
+        accept_when: str = "all",
+        state_key: Optional[Union[str, Callable[[Any], Any]]] = None,
+        output_key: str = "taut_gate",
+        monitor: bool = False,
+        agent: Optional[Any] = None,
+        base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        **kwargs: Any,
+    ):
+        if action not in ("annotate", "route", "raise"):
+            raise ValueError("action must be 'annotate', 'route' or 'raise'; got %r" % (action,))
+        if accept_when not in ("all", "any"):
+            raise ValueError("accept_when must be 'all' or 'any'; got %r" % (accept_when,))
+        gate = self._resolve_gate(gate)
+        if _RUNNABLE_AVAILABLE:
+            super().__init__(
+                gate=gate,
+                questions=questions,
+                action=action,
+                accept_when=accept_when,
+                state_key=state_key,
+                output_key=output_key,
+                monitor=monitor,
+                agent=agent,
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                **kwargs,
+            )
+        else:
+            self.gate = gate
+            self.questions = questions
+            self.action = action
+            self.accept_when = accept_when
+            self.state_key = state_key
+            self.output_key = output_key
+            self.monitor = monitor
+            self.agent = agent
+            self.base_url = base_url
+            self.api_key = api_key
+            self.model = model
+        self._monitor = None
+        if monitor:
+            from ..drift import GateMonitor
+            self._monitor = GateMonitor(gate)
+
+    @staticmethod
+    def _resolve_gate(gate: Any) -> Any:
+        from ..conformal import ConformalGate
+
+        if gate is None:
+            raise ValueError(
+                "TautGate needs a fitted gate: a ConformalGate, a path to one saved with "
+                "gate.save(), or the dict it serialises to. Fit one with "
+                "`taut calibrate` or ConformalGate.calibrate()."
+            )
+        if isinstance(gate, ConformalGate):
+            return gate
+        if isinstance(gate, str):
+            return ConformalGate.load(gate)
+        if isinstance(gate, dict):
+            return ConformalGate.from_dict(gate)
+        raise TypeError("gate must be a ConformalGate, a path, or a serialised dict; got %r"
+                        % type(gate).__name__)
+
+    def _decide(self, input: Any) -> Dict[str, Any]:
+        """The gated result for one input, predicting only when it is not already given."""
+        raw = input
+        if isinstance(input, dict) and isinstance(input.get("answers"), dict):
+            # Already scored -- by an upstream node, or by taut-serve. Do not pay twice.
+            result = {k: v for k, v in input.items() if k != self.output_key}
+        else:
+            if not self.questions:
+                raise ValueError(
+                    "TautGate needs `questions` to score an input that does not already "
+                    "carry an 'answers' block"
+                )
+            text = _extract_text(raw, self.state_key)
+            result = _execute_decision(
+                text, self.questions, agent=self.agent, base_url=self.base_url,
+                api_key=self.api_key, model=self.model,
+            )
+        gated = self.gate.apply(result)
+        if self._monitor is not None:
+            self._monitor.observe(gated)
+        return gated
+
+    def _verdict(self, gated: Dict[str, Any]) -> Dict[str, Any]:
+        blocks = {qid: ans["gate"] for qid, ans in gated.get("answers", {}).items()
+                  if isinstance(ans, dict) and "gate" in ans}
+        abstained = {qid: b for qid, b in blocks.items() if not b.get("accepted", True)}
+        if not blocks:
+            accepted = None                       # nothing gated: not a claim either way
+        elif self.accept_when == "any":
+            accepted = len(abstained) < len(blocks)
+        else:
+            accepted = not abstained
+        record = dict(gated.get("gate", {}))
+        record.update({"accepted": accepted, "abstained": sorted(abstained),
+                       "questions": blocks, "accept_when": self.accept_when})
+        return record
+
+    def invoke(self, input: Any, config: Optional[RunnableConfig] = None) -> Any:
+        gated = self._decide(input)
+        verdict = self._verdict(gated)
+
+        if self.action == "route":
+            # A conditional edge wants a branch name, not a payload.
+            return "accept" if verdict["accepted"] else "escalate"
+
+        if self.action == "raise" and verdict["accepted"] is False:
+            raise TautGateEscalation(
+                "Taut gate abstained on %s; the certified guarantee does not cover this "
+                "decision" % (verdict["abstained"],),
+                abstained={q: verdict["questions"][q] for q in verdict["abstained"]},
+                raw_decision=gated,
+            )
+
+        if isinstance(input, dict):
+            out = dict(input)
+            out.update(gated)
+            out[self.output_key] = verdict
+            return out
+        return {"input": input, "answers": gated.get("answers", {}), self.output_key: verdict}
+
+    def report(self) -> str:
+        """What the gate certifies, for a startup log line."""
+        return self.gate.report()
+
+    def drift(self) -> Dict[str, Any]:
+        """The monitor's verdict. Requires ``monitor=True``."""
+        if self._monitor is None:
+            raise ValueError("TautGate was built with monitor=False; construct it with "
+                             "monitor=True to track whether the gate has expired")
+        return self._monitor.check()
+
+    def __call__(self, state: Any) -> Any:
+        return self.invoke(state)

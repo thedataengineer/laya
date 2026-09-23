@@ -1,6 +1,8 @@
 """Third-party agent and framework integrations for Taut."""
 from .langchain import (
     TautEvaluator,
+    TautGate,
+    TautGateEscalation,
     TautGuardrail,
     TautGuardrailError,
     TautRouter,
@@ -13,4 +15,6 @@ __all__ = [
     "TautGuardrailError",
     "TautTriage",
     "TautEvaluator",
+    "TautGate",
+    "TautGateEscalation",
 ]

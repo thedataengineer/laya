@@ -899,6 +899,47 @@ See [**`docs/langchain.md`**](docs/langchain.md) for full guide, support ticket 
 
 ---
 
+### `TautGate`: branch on the guarantee, not on a number
+
+`TautRouter` and `TautGuardrail` return a score and leave the threshold to you. `TautGate`
+carries a fitted [risk bound](#certified-risk-control) instead, so a node branches on
+"this decision is inside the 2% error budget I signed off":
+
+```python
+from taut.integrations.langchain import TautGate, TautGateEscalation
+
+gate = TautGate(gate="triage_gate.json", action="route")   # "accept" | "escalate"
+
+graph.add_conditional_edges("triage", gate, {
+    "accept":   "auto_resolve",
+    "escalate": "human_review",
+})
+```
+
+The gate is JSON and holds no weights, so it lives next to the graph and is reviewed as a
+diff. Three actions: `annotate` attaches the gate blocks and a verdict to the state,
+`route` returns a branch name for a conditional edge, and `raise` throws
+`TautGateEscalation` carrying the block that refused.
+
+A state that already has an `answers` block — from an upstream node, or from `taut-serve` —
+is **not** scored again, so putting the gate late in a graph costs one NumPy pass and no
+forward pass.
+
+`monitor=True` keeps a `GateMonitor` alive across the run, so a long-lived graph can be
+asked whether its own gate has expired:
+
+```python
+gate = TautGate(gate="triage_gate.json", monitor=True)
+...
+if gate.drift()["status"] == "expired":
+    alert("the triage gate no longer describes this traffic")
+```
+
+Read `family_alpha` on the verdict rather than `alpha`: gating five questions at 2% each
+risks a record wrong somewhere at up to 10%, and the block says so.
+
+---
+
 ## Decision Primitives
 
 | Primitive | Output | Use Cases |
