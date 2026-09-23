@@ -78,6 +78,17 @@ jobs:
           python tests/test_cli.py
           python tests/test_mcp.py
           python tests/test_langchain.py
+          python tests/test_conformal.py
+          python tests/test_load_errors.py
+
+      # test_serve.py and test_truncation_direction.py are pure pytest modules: run as
+      # `python tests/x.py` they define their test functions, call none of them, and exit
+      # 0. That is why they are not in the list above -- and why the HTTP surface was
+      # going untested. They need a collector, so they get one.
+      - name: Server and tokenizer tests (pytest)
+        run: |
+          pip install pytest ".[serve]"
+          python -m pytest tests/test_serve.py tests/test_truncation_direction.py -q
 
       - name: Email cleaning tests
         run: python tests/test_email.py

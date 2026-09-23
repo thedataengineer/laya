@@ -193,6 +193,39 @@ banking77 is the one clear loss, and it is architectural: a choice question's op
 
 Both ship over-confident; `laya-multilingual` ships with no fitted temperatures at all. Refitting one temperature per (question type, option count) on held-out data is the single highest-value fix available, and takes ECE below Jev's measured 0.246.
 
+### From a calibration number to a contract
+
+An ECE of 0.081 is a property of a probability, and a property of a probability is not
+something an operations owner can budget against. It says the number is trustworthy on
+average; it does not say which threshold to run, what that threshold lets through, or what
+happens when the calibration set is too small to tell.
+
+`laya.conformal` converts it. Fit a gate on a labelled split at a risk budget and it
+returns a threshold carrying a distribution-free, finite-sample bound — and, crucially, it
+does so **without assuming the model is calibrated at all**. Calibration buys coverage
+here, not validity: a better-calibrated model clears the same guarantee while abstaining
+on less traffic.
+
+The table below is the same fitting procedure run against three synthetic models that
+differ only in calibration, at `alpha = 0.05`, `delta = 0.05`, 3,000 calibration rows,
+1,000 trials each. Breaches are scored against **population** risk, not a test-set
+estimate — see [`research/conformal/README.md`](research/conformal/README.md) for why that
+distinction decides the answer.
+
+| model | breach rate (budget 5%) | traffic kept |
+|---|---|---|
+| under-confident | 3.0% | 66.0% |
+| calibrated | 4.9% | 51.1% |
+| over-confident | 3.5% | 39.9% |
+
+Validity holds across all three. What calibration moves is the third column: the same 5%
+guarantee costs the over-confident model 26 points of coverage. That is the operational
+value of the ECE number, stated as something a buyer can price.
+
+Across all 21 configurations tested — four risk budgets, three calibration regimes, two
+guardrail prevalences, `selective` and `miss` — every one holds inside its `delta` budget.
+Reproduce with `python research/conformal/validate_risk.py`.
+
 ### Option-order robustness
 
 How often the answer changes when the options are permuted. Jev measured at 0.13.
@@ -256,6 +289,14 @@ On laya_router's 180 requests (zero-shot, one 3-tier `choice`), nearly every con
 - **Both checkpoints ship over-confident.** Fit temperatures on your own data.
 - **Ordinal `score` is the weakest primitive** (SST-5 0.372).
 - `laya` collapses outside English; `laya-multilingual` is weaker on English. Route.
+- **A conformal gate needs exchangeability, and drift breaks it.** The bound holds for any
+  distribution, but only if calibration and serving traffic are drawn from the *same* one.
+  A gate fitted on last quarter's tickets carries no guarantee on this quarter's if the mix
+  moved. Refit on a recent labelled split; the gate is JSON and holds no weights, so
+  regenerating it is cheap.
+- **Risk control cannot manufacture data.** Certifying 1% at 95% confidence needs 299
+  labelled points no matter how good the model is. Below that floor the gate reports
+  `certifiable: False` rather than a threshold, and the only fix is more labels.
 
 ---
 

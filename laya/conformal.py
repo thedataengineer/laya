@@ -8,12 +8,20 @@ distribution, for any model, without asymptotics.
 Three guarantees are on offer, each fitted from a held-out labelled sample:
 
 ``selective``
-    Abstain below a threshold so that the error rate *among the decisions the
-    gate accepts* is at most ``alpha``, with confidence ``1 - delta``. Answers
-    "which 85% of tickets can I auto-route and still be wrong under 2% of the
-    time?" Fitted by fixed-sequence testing over a pre-specified threshold grid
-    with exact Clopper-Pearson upper bounds, so the bound is valid at finite n
-    and needs no multiplicity correction.
+    Abstain below a threshold so that the share of *all* incoming decisions that
+    are both auto-handled and wrong is at most ``alpha``, with confidence
+    ``1 - delta``. Answers "how much of the queue can I auto-route while keeping
+    mistakes under 2% of everything that arrives?" Fitted by fixed-sequence
+    testing over a pre-specified threshold grid with exact Clopper-Pearson upper
+    bounds, so the bound is valid at finite n and needs no multiplicity
+    correction.
+
+    Note the denominator: the certified quantity is joint, not the error rate
+    *among accepted* decisions. That conditional rate is reported as
+    ``empirical_selective_risk`` but deliberately left uncertified -- see
+    :func:`selective_threshold` for why bounding it is not sound here. Since
+    accepted-and-wrong is a subset of accepted, the joint bound also caps the
+    conditional rate at ``alpha / coverage``.
 
 ``set``
     Emit a *set* of options guaranteed to contain the true option with marginal
@@ -64,6 +72,7 @@ __all__ = [
     "QuestionGate",
     "binomial_upper_bound",
     "selective_threshold",
+    "miss_threshold",
     "min_calibration_size",
     "conformal_quantile",
     "SUPPORTED_MODES",
@@ -138,13 +147,13 @@ def binomial_upper_bound(k: int, n: int, delta: float = 0.05) -> float:
 # --------------------------------------------------------------------------------------
 
 def min_calibration_size(alpha: float, delta: float) -> int:
-    """Fewest accepted decisions that could ever certify risk ``alpha`` at confidence ``delta``.
+    """Fewest calibration points that could ever certify risk ``alpha`` at confidence ``delta``.
 
-    Even with a perfect record -- zero errors -- an exact binomial bound on ``n`` trials
+    Even with a flawless record -- zero losses -- an exact binomial bound on ``n`` points
     cannot fall below ``alpha`` until ``n >= log(delta) / log(1 - alpha)``. Certifying 5%
-    risk at 95% confidence therefore needs 59 accepted decisions, 2% needs 149, and 1%
-    needs 299. Thresholds that accept fewer are untestable rather than unsafe, and a gate
-    that reports which of the two it hit is far more useful than one that silently abstains.
+    at 95% confidence therefore needs 59 points, 2% needs 149, and 1% needs 299. A gate
+    that reports "not enough data" instead of quietly returning a threshold it cannot
+    stand behind is the difference between a guarantee and a number.
     """
     if not (0.0 < alpha < 1.0) or not (0.0 < delta < 1.0):
         raise ValueError("alpha and delta must both lie in (0, 1)")
@@ -246,20 +255,6 @@ def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
     best["certifiable"] = True
     best["candidates_tested"] = tested
     return best
-
-
-def min_calibration_size(alpha: float, delta: float) -> int:
-    """Fewest calibration points that could ever certify risk ``alpha`` at confidence ``delta``.
-
-    Even with a flawless record -- zero losses -- an exact binomial bound on ``n`` points
-    cannot fall below ``alpha`` until ``n >= log(delta) / log(1 - alpha)``. Certifying 5%
-    at 95% confidence therefore needs 59 points, 2% needs 149, and 1% needs 299. A gate
-    that reports "not enough data" instead of quietly returning a threshold it cannot
-    stand behind is the difference between a guarantee and a number.
-    """
-    if not (0.0 < alpha < 1.0) or not (0.0 < delta < 1.0):
-        raise ValueError("alpha and delta must both lie in (0, 1)")
-    return int(math.ceil(math.log(delta) / math.log(1.0 - alpha)))
 
 
 def miss_threshold(scores: np.ndarray, positive: np.ndarray, alpha: float,
@@ -847,6 +842,10 @@ class ConformalGate:
         gate pass through untouched unless ``strict`` is set, which raises instead --
         use it in production to catch a question set that drifted away from the gate
         it was calibrated against.
+
+        The record-level ``gate`` block carries ``family_alpha``: the union bound over
+        every gated question. It is *not* ``alpha`` unless exactly one question is gated.
+        See :meth:`family_risk`.
         """
         answers = result.get("answers")
         if answers is None:
@@ -872,14 +871,59 @@ class ConformalGate:
 
         out = dict(result)
         out["answers"] = out_answers
-        out["gate"] = {
-            "accepted": accepted_all if gated_any else None,
-            "alpha": self.alpha,
-            "delta": self.delta,
-            "questions_gated": sum(1 for q in answers if q in self.gates),
-            "questions_ungated": sum(1 for q in answers if q not in self.gates),
-        }
+        gated_ids = [q for q in answers if q in self.gates]
+        out["gate"] = dict(
+            {
+                "accepted": accepted_all if gated_any else None,
+                "alpha": self.alpha,
+                "delta": self.delta,
+                "questions_gated": len(gated_ids),
+                "questions_ungated": sum(1 for q in answers if q not in self.gates),
+            },
+            **self.family_risk(gated_ids)
+        )
         return out
+
+    def family_risk(self, qids: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+        """The risk carried by accepting a *whole record*, not one answer.
+
+        Each question's gate is certified at its own ``alpha``. Reading the record-level
+        ``accepted`` flag as though it inherited that number is the single easiest way to
+        misuse this module: accepting five answers at 2% each risks a record that is
+        accepted and wrong somewhere at up to 10%, by the union bound. The bound is loose
+        when errors co-occur and tight when they are disjoint, and it is the only
+        distribution-free statement available without modelling the dependence between
+        questions -- so it is the one reported.
+
+        ``family_delta`` unions only over the modes that carry a confidence parameter
+        (``selective`` and ``miss``). Split-conformal ``set`` and ``interval`` coverage is
+        marginal over the calibration draw and has no ``delta`` to spend.
+
+        Returns a block with ``family_alpha``, ``family_delta`` and a plain-language
+        ``family_guarantee``; both are capped at 1.0, where the honest reading is that the
+        record-level flag carries no usable guarantee and the per-question blocks should
+        be read individually.
+        """
+        ids = list(self.gates) if qids is None else [q for q in qids if q in self.gates]
+        alpha = sum(self.gates[q].alpha for q in ids)
+        delta = sum(self.gates[q].delta for q in ids
+                    if self.gates[q].mode in ("selective", "miss"))
+        alpha = min(1.0, alpha)
+        delta = min(1.0, delta)
+        if not ids:
+            guarantee = "no gated questions in this record; the record-level flag is not a claim"
+        elif alpha >= 1.0:
+            guarantee = ("%d gated questions at these alphas union to a vacuous record-level "
+                         "bound; read each question's gate block instead" % len(ids))
+        else:
+            guarantee = ("at most %.4g of accepted records are wrong on at least one of the "
+                         "%d gated questions, with confidence %.4g (union bound)"
+                         % (alpha, len(ids), 1.0 - delta))
+        return {
+            "family_alpha": alpha,
+            "family_delta": delta,
+            "family_guarantee": guarantee,
+        }
 
     def apply_batch(self, results: Sequence[Mapping[str, Any]],
                     strict: bool = False) -> List[Dict[str, Any]]:

@@ -207,3 +207,120 @@ def test_health_stays_available_during_inference(monkeypatch):
     assert seen["slow"] == 200
     assert seen["health"] == 200 and seen["payload"]["status"] == "ok"
     assert fake.threads and "MainThread" not in fake.threads, fake.threads
+
+
+# ---------------------------------------------------------------- certified risk gating
+# With LAYA_GATE set the server stops being a scorer and becomes a decision service.
+# The gate is the operator's, loaded once at startup, and never a request field.
+
+def _fitted_gate(alpha=0.05, delta=0.05, mode="selective"):
+    """A real ConformalGate over the question FakeRouter answers."""
+    import numpy as np
+
+    from laya.conformal import ConformalGate
+
+    rng = np.random.default_rng(3)
+    results, labels = [], []
+    for _ in range(800):
+        gold = "billing" if rng.random() < 0.5 else "tech"
+        p = float(rng.beta(6, 2))
+        p_billing = p if gold == "billing" else 1.0 - p
+        results.append({"answers": {"dept": {
+            "type": "choice",
+            "choice": "billing" if p_billing >= 0.5 else "tech",
+            "probabilities": {"billing": p_billing, "tech": 1.0 - p_billing},
+            "confidence": max(p_billing, 1.0 - p_billing),
+        }}})
+        labels.append({"dept": gold})
+    return ConformalGate.calibrate(results, labels, alpha=alpha, delta=delta,
+                                   mode={"dept": mode})
+
+
+def _gate_file(tmp_path, gate):
+    path = tmp_path / "gate.json"
+    gate.save(str(path))
+    return str(path)
+
+
+def test_ungated_server_reports_no_gate(monkeypatch):
+    monkeypatch.delenv("LAYA_GATE", raising=False)
+    client, _ = _client(monkeypatch)
+    assert client.get("/health").json()["gate"] is None
+    assert "gate" not in client.post("/v1/systemone", json=REQ).json()
+
+
+def test_gate_from_env_certifies_every_answer(monkeypatch, tmp_path):
+    monkeypatch.delenv("LAYA_API_KEY", raising=False)
+    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate()))
+    client = TestClient(create_app(router=FakeRouter()))
+
+    body = client.post("/v1/systemone", json=REQ).json()
+    blk = body["answers"]["dept"]["gate"]
+    assert blk["mode"] == "selective"
+    assert blk["alpha"] == 0.05 and blk["delta"] == 0.05
+    assert blk["accepted"] is (blk["top_probability"] >= blk["threshold"])
+    # the original answer survives alongside the guarantee
+    assert body["answers"]["dept"]["choice"] == "billing"
+    assert body["usage"] == {"input_tokens": 42, "output_tokens": 0}
+    # and the record-level block carries the union bound, not the per-question alpha
+    assert body["gate"]["family_alpha"] == 0.05
+    assert body["gate"]["questions_gated"] == 1
+
+
+def test_health_advertises_the_contract(monkeypatch, tmp_path):
+    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
+    client = TestClient(create_app(router=FakeRouter()))
+    g = client.get("/health").json()["gate"]
+    assert g["alpha"] == 0.02
+    assert g["questions"] == ["dept"] and g["modes"] == {"dept": "selective"}
+    assert "union bound" in g["family_guarantee"]
+    assert g["strict"] is False
+
+
+def test_injected_gate_overrides_the_environment(monkeypatch, tmp_path):
+    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
+    client = TestClient(create_app(router=FakeRouter(), risk_gate=_fitted_gate(alpha=0.10)))
+    assert client.get("/health").json()["gate"]["alpha"] == 0.10
+
+
+def test_strict_mode_rejects_uncalibrated_questions(monkeypatch, tmp_path):
+    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate()))
+    monkeypatch.setenv("LAYA_GATE_STRICT", "1")
+    client = TestClient(create_app(router=FakeRouter()))
+    # FakeRouter always answers "dept"; a gate fitted on something else must 422 rather
+    # than pass the answer through wearing no guarantee.
+    other = TestClient(create_app(router=FakeRouter(),
+                                  risk_gate=_fitted_gate()))  # sanity: same questions pass
+    assert other.post("/v1/systemone", json=REQ).status_code == 200
+
+    import numpy as np
+
+    from laya.conformal import ConformalGate
+    rng = np.random.default_rng(5)
+    res = [{"answers": {"other_q": {"type": "noul", "noul": float(rng.beta(5, 2)),
+                                    "confidence": 0.8}}} for _ in range(400)]
+    lab = [{"other_q": bool(rng.random() < 0.5)} for _ in range(400)]
+    mismatched = ConformalGate.calibrate(res, lab, alpha=0.05)
+    strict = TestClient(create_app(router=FakeRouter(), risk_gate=mismatched))
+    r = strict.post("/v1/systemone", json=REQ)
+    assert r.status_code == 422
+    assert "gate could not be applied" in r.json()["detail"]
+    assert "no gate fitted" in r.json()["detail"]
+
+
+def test_a_gate_that_will_not_load_stops_the_server(monkeypatch, tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    monkeypatch.setenv("LAYA_GATE", str(bad))
+    # Serving ungated while advertising a guarantee is the worst outcome available,
+    # so a broken gate is fatal rather than a warning.
+    with pytest.raises(RuntimeError, match="could not be loaded as a conformal gate"):
+        create_app(router=FakeRouter())
+
+
+def test_gate_is_not_a_request_field(monkeypatch, tmp_path):
+    """A caller must not be able to name its own risk budget."""
+    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
+    client = TestClient(create_app(router=FakeRouter()))
+    body = client.post("/v1/systemone", json=dict(REQ, alpha=0.5, gate={"alpha": 0.5})).json()
+    assert body["answers"]["dept"]["gate"]["alpha"] == 0.02

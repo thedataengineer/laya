@@ -34,6 +34,10 @@ Three checkpoints, and a `Router` that picks between them per request:
 | [`laya-multilingual`](https://huggingface.co/convaiinnovations/laya-multilingual) | mmBERT-base | 322M | 1024 | 100+ languages, 2x faster |
 | [`laya-typed-decisions`](https://huggingface.co/convaiinnovations/laya-typed-decisions) | ModernBERT-large | 421M | 1024 | the typed-decisions workflows |
 
+### What's new in 0.4.0
+
+* **Certified risk control.** `laya.conformal` turns a calibrated probability into an operating contract: a threshold, prediction set or interval carrying a distribution-free, finite-sample guarantee. Four modes — `selective`, `miss`, `set`, `interval` — fitted from a labelled split, serialised to JSON, applied without torch. It reports when your calibration set is too small to certify anything rather than returning a threshold it cannot stand behind. See [Certified Risk Control](#certified-risk-control).
+
 ### What's new in 0.3.9
 
 * Documentation update only. There are no code or checkpoint changes from 0.3.8.
@@ -452,6 +456,172 @@ else:
     # Low confidence: escalate to human triage
     escalate_to_human_agent(dept, reason=f"Low confidence ({conf:.2f})")
 ```
+
+That `0.85` is a guess. It is a reasonable guess — calibrated probabilities are what make
+it reasonable — but nothing here tells you what the guess costs, and nobody can sign off
+on a number whose error rate is unknown. [Certified Risk Control](#certified-risk-control)
+replaces it with a threshold that is fitted, not chosen, and that carries a bound.
+
+---
+
+## Certified Risk Control
+
+Every model in this space returns a score. A score is not an operating decision, and the
+gap between them is where the work actually is: someone still has to pick a cutoff, and
+own what it lets through.
+
+`laya.conformal` closes that gap. Give it a labelled held-out split and a risk budget, and
+it returns a threshold with a **distribution-free, finite-sample guarantee** — valid for
+any data distribution, at the sample size you actually have, with no asymptotics and no
+assumption that the model is well calibrated:
+
+> at most 2% of incoming tickets are auto-handled incorrectly, with 95% confidence
+
+```python
+from laya import Agent, ConformalGate, triage_questions
+
+agent = Agent()
+questions = triage_questions()
+
+# 1. Score a labelled held-out split
+results = agent.predict_batch(dev_states, questions)
+
+# 2. Fit the gate to a risk budget you can defend in a review
+gate = ConformalGate.calibrate(results, dev_labels, alpha=0.02, delta=0.05)
+print(gate.report())
+gate.save("triage_gate.json")
+
+# 3. Apply it per request
+decision = gate.apply(agent.predict(ticket, questions))
+if decision["answers"]["intent"]["gate"]["accepted"]:
+    auto_route(decision["answers"]["intent"]["choice"])
+else:
+    escalate(ticket)
+```
+
+```
+Laya conformal gate  alpha=0.02  delta=0.05  n=1200
+
+question               type      mode       operating point          guarantee
+------------------------------------------------------------------------------
+intent                 choice    selective  keep 45.7% @ tau=0.705   accepted-and-wrong <= 0.02 of all
+unsafe                 noul      miss       block 52.2% @ tau=0.285  miss <= 0.02 of positives
+severity               score     interval   +/- 2.13 levels          coverage >= 0.98
+```
+
+That table is the point. It states in one line what you are buying and what it costs —
+the coverage you keep, the threshold that buys it, and the guarantee attached — which is
+the artefact a risk owner signs, not a score.
+
+### Four guarantees
+
+| mode | question types | the contract |
+|---|---|---|
+| `selective` | `choice`, `noul` | at most `alpha` of **all** decisions are both auto-handled and wrong |
+| `miss` | `noul` | at most `alpha` of **true positives** slip past the guardrail |
+| `set` | `choice` | the returned **set of options** contains the truth with probability ≥ `1 - alpha` |
+| `interval` | `score` | the true level falls in the returned **interval** with probability ≥ `1 - alpha` |
+
+`selective` and `miss` are fitted by fixed-sequence testing over a threshold grid fixed
+before any data is read, with exact **Clopper-Pearson** bounds — not Hoeffding, not a
+normal approximation, because real calibration sets are hundreds of rows, not thousands.
+`set` and `interval` are split conformal with the finite-sample `(n+1)` correction.
+
+### It tells you when it cannot help
+
+An exact binomial bound on `n` points cannot fall below `alpha` until
+`n ≥ log(delta) / log(1 - alpha)`, however flawless the record. Certifying 5% at 95%
+confidence needs 59 labelled points, 2% needs 149, 1% needs 299.
+
+```python
+>>> from laya import min_calibration_size
+>>> min_calibration_size(0.01, 0.05)
+299
+```
+
+Below that floor the gate does not return a threshold it cannot stand behind. It abstains,
+sets `certifiable: False`, and reports a `shortfall` block naming the floor it missed and
+how many rows short it is. Refusing to answer is a feature — it is the whole difference
+between a guarantee and a number.
+
+### Read `family_alpha`, not `alpha`, for a whole record
+
+Gating five questions at 2% each does **not** make the record 2%. By the union bound it is
+up to 10%, and the record-level block says so:
+
+```python
+>>> decision["gate"]["family_alpha"]
+0.1
+>>> decision["gate"]["family_guarantee"]
+'at most 0.1 of accepted records are wrong on at least one of the 5 gated questions,
+ with confidence 0.75 (union bound)'
+```
+
+Silently inheriting the per-question number here is the easiest way to misuse risk
+control, so the module refuses to let you.
+
+### The gate ships without the model
+
+A fitted gate is JSON: thresholds and diagnostics, no weights. `laya.conformal` is pure
+NumPy and imports neither torch nor transformers, so a gate can be fitted on a GPU box,
+committed to your repo, reviewed as a diff, and applied in an edge process that never
+loads a model.
+
+```bash
+$ python -c "import laya, sys; laya.ConformalGate.load('triage_gate.json'); print('torch' in sys.modules)"
+False
+```
+
+### Serve it, or run it from the shell
+
+Point `LAYA_GATE` at a saved gate and `laya-serve` stops being a scorer and becomes a
+decision service. The risk budget is the operator's, fixed at deploy time and readable
+from `/health` — deliberately not a request field, because a client that can name its own
+`alpha` can claim any guarantee it likes.
+
+```bash
+LAYA_GATE=triage_gate.json laya-serve
+```
+
+```jsonc
+// GET /health
+{"status": "ok", "gate": {"alpha": 0.02, "delta": 0.05, "questions": ["intent"],
+                          "modes": {"intent": "selective"},
+                          "family_alpha": 0.02, "family_guarantee": "..."}}
+
+// POST /v1/systemone -> every answer carries its gate block
+{"answers": {"intent": {"choice": "billing", "gate": {"accepted": true, ...}}},
+ "gate": {"accepted": true, "family_alpha": 0.02, ...}}
+```
+
+A gate that will not load is fatal rather than a warning: a server configured to certify
+its answers and then quietly not doing so is the worst outcome available. Set
+`LAYA_GATE_STRICT=1` to reject requests carrying questions the gate was not calibrated on,
+instead of passing them through wearing no guarantee.
+
+From the shell:
+
+```bash
+laya --gate triage_gate.json --report              # what does this gate certify?
+laya "billed twice" --predict --gate triage_gate.json
+```
+
+```
+intent      : ACCEPT     at most 0.02 of all decisions are accepted and wrong, with confidence 0.95
+
+record      : at most 0.02 of accepted records are wrong on at least one of the 1 gated questions, with confidence 0.95 (union bound)
+```
+
+### Is the bound real?
+
+It is a falsifiable claim, so it has been falsification-tested: 1,000 trials per
+configuration, scored against **population** risk rather than a sampled estimate, across
+calibrated, overconfident and underconfident models. 21 of 21 configurations hold inside
+the `delta` budget; the worst cell breaches 4.9% of the time against a 5% allowance.
+
+Method, full table and the honest limitations are in
+[`research/conformal/README.md`](research/conformal/README.md). Reproduce with
+`python research/conformal/validate_risk.py`.
 
 ---
 

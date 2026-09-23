@@ -25,8 +25,19 @@ env var                 meaning                                        default
                         logical/hyperthread count is a large regression.
 ``LAYA_AUTO_TASK``      auto-route to the typed-decisions checkpoint   0
 ``LAYA_API_KEY``        if set, require ``Authorization: Bearer <it>``  (none)
+``LAYA_GATE``           path to a ConformalGate JSON; every answer     (none)
+                        carries a certified ``gate`` block and the
+                        response a record-level one
+``LAYA_GATE_STRICT``    with ``LAYA_GATE``, reject a request whose     0
+                        questions the gate was not calibrated on
 ``LAYA_LOG_LEVEL``      uvicorn log level                              info
 ======================  ============================================  =========
+
+With ``LAYA_GATE`` set the server stops being a scorer and becomes a decision
+service: the risk budget is the operator's, fixed at deploy time and visible in
+``GET /health``, rather than a threshold each caller invents. Deliberately not a
+request field -- a client that can name its own ``alpha`` can claim any guarantee
+it likes.
 
 Imports of heavy dependencies (fastapi, uvicorn, torch via Router) are all
 deferred into the functions that need them, so ``import laya.serve`` stays cheap
@@ -47,6 +58,26 @@ _PUBLISHED_MODEL_IDS = {
     "convaiinnovations/laya-multilingual": "multilingual",
     "convaiinnovations/laya-typed-decisions": "typed-decisions",
 }
+
+
+def load_gate() -> Optional[Any]:
+    """The ``ConformalGate`` named by ``LAYA_GATE``, or None when unset.
+
+    Loaded once at app creation and never reloaded: a gate that changed under a running
+    server would silently move the guarantee the ``/health`` probe is advertising.
+    Failure to load is fatal rather than a warning -- a server configured to certify its
+    answers and then quietly not doing so is the worst of the available outcomes.
+    """
+    path = (os.environ.get("LAYA_GATE") or "").strip()
+    if not path:
+        return None
+    from .conformal import ConformalGate
+
+    try:
+        return ConformalGate.load(path)
+    except Exception as exc:  # noqa: BLE001 -- refuse to start rather than serve ungated
+        raise RuntimeError("LAYA_GATE=%s could not be loaded as a conformal gate: %s"
+                           % (path, exc)) from exc
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -108,9 +139,13 @@ def build_router():
     return router
 
 
-def create_app(router: Optional[Any] = None):
+def create_app(router: Optional[Any] = None, risk_gate: Optional[Any] = None):
     """Build the FastAPI app. Pass a Router to inject one (tests); otherwise one
-    is built from the environment (and preloaded) at app-creation time."""
+    is built from the environment (and preloaded) at app-creation time.
+
+    ``risk_gate`` likewise overrides ``LAYA_GATE``; pass a fitted
+    :class:`~laya.conformal.ConformalGate` to certify every answer this server returns.
+    """
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
 
@@ -118,6 +153,9 @@ def create_app(router: Optional[Any] = None):
 
     if router is None:
         router = build_router()
+    if risk_gate is None:
+        risk_gate = load_gate()
+    gate_strict = _env_bool("LAYA_GATE_STRICT", False)
     api_key = os.environ.get("LAYA_API_KEY") or None
 
     # Inference is synchronous torch, and a CPU call takes hundreds of milliseconds to
@@ -146,11 +184,26 @@ def create_app(router: Optional[Any] = None):
 
     @app.get("/health")
     def health() -> Dict[str, Any]:
-        return {
+        payload = {
             "status": "ok",
             "loaded": router.loaded,
             "device": os.environ.get("LAYA_DEVICE") or "auto",
+            "gate": None,
         }
+        if risk_gate is not None:
+            # The guarantee is part of the service contract, so a caller can read it
+            # without having to trust a README.
+            payload["gate"] = dict(
+                {
+                    "alpha": risk_gate.alpha,
+                    "delta": risk_gate.delta,
+                    "questions": sorted(risk_gate.gates),
+                    "modes": {q: g.mode for q, g in sorted(risk_gate.gates.items())},
+                    "strict": gate_strict,
+                },
+                **risk_gate.family_risk()
+            )
+        return payload
 
     @app.post("/v1/systemone")
     async def systemone(request: Request, authorization: Optional[str] = Header(default=None)):
@@ -169,12 +222,21 @@ def create_app(router: Optional[Any] = None):
             # hs-jev decodes `answers` and `usage` and ignores the rest.
             async with gate:
                 loop = asyncio.get_running_loop()
-                return await loop.run_in_executor(
+                result = await loop.run_in_executor(
                     pool, lambda: router.predict(state, questions, model=model))
         except HTTPException:
             raise
         except Exception as e:  # noqa: BLE001 -- surface model/tokenizer errors as 422
             raise HTTPException(status_code=422, detail=str(e))
+
+        if risk_gate is None:
+            return result
+        try:
+            # Gating is pure NumPy over probabilities already computed, so it stays on
+            # the event loop rather than costing a second executor hop.
+            return risk_gate.apply(result, strict=gate_strict)
+        except Exception as e:  # noqa: BLE001 -- a gate/question mismatch is the caller's
+            raise HTTPException(status_code=422, detail="gate could not be applied: %s" % e)
 
     return app
 

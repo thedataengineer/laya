@@ -12,7 +12,7 @@ from .presets import (
 )
 from .router import DEFAULT_MODELS, RouteDecision, Router
 
-__version__ = "0.3.9"
+__version__ = "0.4.0"
 
 # Routing, language detection and email cleaning are pure Python. The torch-backed names are
 # resolved lazily so that `import laya` -- and therefore `from laya import Router` or
@@ -36,6 +36,14 @@ _LAZY_ATTRS = {
     "LayaGuardrailError": (".integrations", "LayaGuardrailError"),
     "LayaTriage": (".integrations", "LayaTriage"),
     "LayaEvaluator": (".integrations", "LayaEvaluator"),
+    # Risk control is pure NumPy -- lazy only so `import laya` stays cheap, not because
+    # it needs torch. A gate can be fitted, saved and applied with torch absent.
+    "ConformalGate": (".conformal", "ConformalGate"),
+    "QuestionGate": (".conformal", "QuestionGate"),
+    "selective_threshold": (".conformal", "selective_threshold"),
+    "miss_threshold": (".conformal", "miss_threshold"),
+    "min_calibration_size": (".conformal", "min_calibration_size"),
+    "binomial_upper_bound": (".conformal", "binomial_upper_bound"),
 }
 
 
@@ -87,5 +95,11 @@ __all__ = [
     "LayaGuardrailError",
     "LayaTriage",
     "LayaEvaluator",
+    "ConformalGate",
+    "QuestionGate",
+    "selective_threshold",
+    "miss_threshold",
+    "min_calibration_size",
+    "binomial_upper_bound",
     "__version__",
 ]

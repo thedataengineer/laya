@@ -1,119 +1,110 @@
-# Handoff: conformal risk control for Laya
+# Handoff: certified risk control
 
-Branch `feat/conformal-risk-control`, commit `cf6d1f7`, one new file: `laya/conformal.py` (980 lines).
-Local only, not pushed. `main` is clean and still at exact parity with upstream.
+Branch `feat/conformal-risk-control`. `laya/conformal.py` plus its wiring into the package,
+the HTTP server, the CLI, the test suite and CI. Version bumped to 0.4.0.
 
-```bash
-git push -u origin feat/conformal-risk-control
-```
+## Why this exists
 
-## Why this module exists
+Laya's headline claim is calibration: ECE 0.081 against Jev's 0.246. On its own that number
+is marketing — a caller still has to guess a confidence threshold by hand, and nothing tells
+them what the guess costs. This module converts the calibrated probability into a contract
+someone can be held to: "at most 2% of the queue is auto-handled incorrectly, at 95%
+confidence."
 
-Laya's headline claim is calibration: ECE 0.081 against Jev's 0.246. That number is currently
-marketing. A caller still has to guess a confidence threshold by hand, and nothing tells them what
-guessing costs. This module converts the calibrated probability into a contract a buyer can hold
-someone to: "at most 2% of the queue is auto-handled incorrectly, at 95% confidence."
+Nothing in the competitive set ships this. Jev returns a score. Llama Guard and ShieldGemma
+return a score. semantic-router and SetFit return a score. **The gate is the differentiator,
+not the encoder.**
 
-Nothing in the competitive set ships this. Jev returns a score. Llama Guard and ShieldGemma return a
-score. semantic-router and SetFit return a score. The gate is the differentiator, not the encoder.
+Pure NumPy — no torch, no transformers — so it keeps the lightweight-import property, and a
+fitted gate serialises to JSON an edge client can apply without a model.
 
-It is pure NumPy. No torch, no transformers, so it keeps the 0.3.8 lightweight-import property and a
-fitted gate serialises to JSON that an edge client can apply without a model.
+## The open question from the previous handoff is closed
 
-## Read this before touching the code
+The prior round reported 3 of 7 configurations breaching their `delta` budget, verdict
+"inconclusive, do not ship the guarantee language". That verdict was correct to make and
+the suspected cause was the right one.
 
-Two decisions cost real time to reach. Do not re-litigate them without reading the reasoning in the
-module docstring and `selective_threshold`.
+It was measurement. Fixed-sequence testing returns the *most permissive* threshold that
+still passes, so true risk sits just under `alpha` by construction; scoring that against a
+5,000-row sampled test set, where the estimate carries a standard error near 0.003, puts a
+true risk of 0.048 above 0.05 a large fraction of the time regardless of validity. The tell
+was that apparent breaches got *worse* as calibration data grew.
 
-**The certified quantity is the joint accepted-and-wrong rate, not error-among-accepted.** The
-conditional rate's denominator shrinks as the threshold rises, so bounding it requires a
-data-dependent threshold whose accepted set is selected by the same order statistics under test. An
-exact binomial bound is not valid there. Measured, on the first implementation: fitting the
-conditional rate breached a 5% budget on 4 of 14 certified trials. The joint loss holds the
-denominator at the full calibration size, where the binomial model is exact and fixed-sequence
-testing over a pre-specified grid is sound. The conditional rate is still reported, labelled as
-observed rather than certified.
+`research/conformal/validate_risk.py` re-runs it against population risk — labels drawn
+`Bernoulli(c(p))` for a known link, so `R(tau) = E[1{p >= tau}(1 - c(p))]` is exact on a
+frozen two-million-row pool with no label sampling anywhere in the loop. 1,000 trials per
+configuration, across calibrated, overconfident and underconfident models, because a
+distribution-free bound that only holds for honest models is not distribution-free.
 
-**Clopper-Pearson, not Hoeffding or a normal approximation.** Calibration sets here are hundreds of
-rows. `min_calibration_size()` reports the floor below which nothing is certifiable: 59 rows for
-alpha=0.05 at delta=0.05, 149 for 0.02, 299 for 0.01. Below it the gate returns "not certifiable"
-with a `shortfall` block rather than a threshold it cannot stand behind.
+**21 of 21 configurations hold inside budget. Worst cell: 49/1000, a 4.9% breach rate
+against a 5% allowance.** Full table and method in `research/conformal/README.md`.
 
-## What is verified
+The earlier suspicion that the fixed-sequence walk returns the wrong endpoint was
+unfounded, and worth not re-litigating: returning the *last* passing threshold is exactly
+what FWER control licenses. Let `j*` be the first index whose true risk exceeds `alpha`; a
+false rejection requires reaching and rejecting there, which happens with probability at
+most `delta`. The guarantee language is safe to ship.
 
-| Check | Result |
+## What was fixed while wiring it up
+
+- **The module docstring promised the conditional rate** — error among accepted — which
+  `selective_threshold` explicitly refuses to certify and says so in its own docstring. The
+  top-level claim was the one a reader meets first. Now states the joint rate, and notes
+  that the joint bound caps the conditional at `alpha / coverage`.
+- **`min_calibration_size` was defined twice**, the second silently shadowing the first.
+  Identical bodies, so benign, but it is the function the "not certifiable" path depends on.
+- **`ConformalGate.apply` inflated the record-level claim.** Five questions gated at 2% each
+  is a record-level risk of up to 10% by the union bound, not 2%. The block now carries
+  `family_alpha`, `family_delta` and `family_guarantee`; `family_delta` unions only over
+  `selective` and `miss`, since split-conformal `set` and `interval` spend no `delta`.
+  Inheriting the per-question number here is the easiest way to misuse risk control.
+- **`miss_threshold` was public and documented but missing from `__all__`.**
+- **CI never ran `tests/test_serve.py`.** It is a pure pytest module, so `python
+  tests/test_serve.py` defines its tests, calls none, and exits 0 — which is why it was
+  never added to the direct-invocation list. The HTTP surface was untested in CI. There is
+  now a pytest step covering it and `test_truncation_direction.py`, and
+  `test_load_errors.py` joined the direct list.
+
+## What shipped
+
+| | |
 |---|---|
-| Clopper-Pearson against its defining equation P(Bin(n,p) <= k) = delta | exact to 6 decimal places, n from 10 to 100 |
-| `calibrate` / `report` / `apply` / `save` / `load` end to end | passes, JSON round trip clean |
-| `set` mode LAC marginal coverage, fresh split | 0.9005 at target 0.90; 0.9509 at target 0.95 |
-| `set` mode APS marginal coverage, fresh split | 0.9707 at target 0.90; 0.9922 at target 0.95, conservative as expected |
-| `interval` mode | never exercised |
+| `laya/conformal.py` | four modes: `selective`, `miss`, `set`, `interval` |
+| `laya/__init__.py` | lazy exports; `import laya` stays torch-free, and so does applying a gate |
+| `laya/serve.py` | `LAYA_GATE`, `LAYA_GATE_STRICT`, contract advertised on `GET /health` |
+| `laya/cli.py` | `--gate PATH`, `--report` |
+| `tests/test_conformal.py` | 152 checks, runs in ~1.2 s |
+| `tests/test_serve.py` | 7 new gating tests |
+| `tests/test_cli.py` | 11 new gating tests |
+| `research/conformal/` | validation harness and its results |
+| `README.md`, `BENCHMARKS.md` | the competitive claim, with the evidence behind it |
 
-## The open question, and it is the important one
+`interval` mode, never exercised before, now has fresh-split coverage measured: 0.9152 at
+target 0.90, 0.9536 at target 0.95, and the infeasible path degrades to the full range,
+which always covers.
 
-Empirical breach counts for `selective` and `miss` on fresh splits, 200 trials each, budget 5%:
+Full suite: 29 of 31 files pass. The two that do not are environmental and pre-existing —
+`test_fast.py` needs CUDA, `test_local_e2e.py` needs locally trained weights at
+`~/laya_models`. Neither is in CI.
 
-| mode | alpha | n_cal | breaches |
-|---|---|---|---|
-| selective | 0.10 | 500 | 9/200 |
-| selective | 0.05 | 500 | 8/200 |
-| selective | 0.05 | 3000 | 16/200 |
-| selective | 0.02 | 3000 | 12/200 |
-| miss | 0.10 | 2000 | 9/200 |
-| miss | 0.05 | 2000 | 8/200 |
-| miss | 0.01 | 2000 | 13/200 |
+## Where the risk actually sits now
 
-Three rows sit above the 10/200 budget. **This is most likely a flaw in how I measured, not in the
-gate**, and the shape of the numbers is the evidence: breaches get *worse* as calibration data grows,
-which is backwards for a real validity failure and exactly what measurement noise predicts.
+**Exchangeability, not the bound.** The bound holds for any distribution, but calibration
+and serving traffic have to be drawn from the same one. A gate fitted on last quarter's
+tickets carries no guarantee on this quarter's if the mix moved, and nothing in the module
+detects that. The gate is JSON and holds no weights, so refitting is cheap — but somebody
+has to decide when. **A drift check that tells an operator their gate has expired is the
+next thing worth building**, and it is a product feature, not a research one.
 
-The mechanism: fixed-sequence testing deliberately returns the most permissive threshold that still
-passes, so true risk at the chosen threshold sits just under alpha by construction. I then scored
-each trial against a 5000-row test sample, where the risk estimate has a standard error near 0.003.
-When true risk is 0.048 and alpha is 0.05, that estimate lands above alpha a large fraction of the
-time regardless of whether the guarantee holds. More calibration data tightens the bound, pushes the
-chosen threshold closer to the boundary, and inflates the apparent breach rate. That is the observed
-pattern.
-
-**Verdict: inconclusive, not failing.** Do not ship the `selective` guarantee language until this is
-settled either way.
-
-### How to settle it
-
-Score against true risk rather than a sampled estimate. The synthetic generator draws labels from the
-model's own probabilities, so true risk at threshold tau is available in closed form with no label
-sampling noise:
-
-```python
-r_true = float((( test_p.max(1) >= tau) * (1.0 - test_p.max(1))).mean())
-breach = r_true > alpha
-```
-
-Use 200k test rows, keep 200 trials, and expect at most 5% breaches. If breaches stay above budget
-with true risk, the bug is real and lives in the fixed-sequence walk in `selective_threshold`; start
-by checking whether returning the last passing threshold rather than the first is what breaks the
-family-wise argument.
-
-Same correction applies to `miss`, scored against positives only.
-
-## Remaining work, in order
-
-1. Re-run validation against true risk as above. Gates everything else.
-2. Exercise `interval` mode. My throwaway script had `np.arange(L, float)`, which raises
-   `TypeError`; the module itself correctly uses `dtype=np.float64`, so interval is untested rather
-   than broken.
-3. Export from `laya/__init__.py`. Add to `_LAZY_ATTRS` and `__all__`, keeping the lazy pattern so
-   `import laya` stays torch-free: `"ConformalGate": (".conformal", "ConformalGate")`, same for
-   `QuestionGate`, `min_calibration_size`, `binomial_upper_bound`.
-4. Write `tests/test_conformal.py`. CI runs test files directly as `python tests/test_x.py`, so
-   follow `tests/test_router.py`: module-level asserts, collect failures, `sys.exit(1 if FAIL else 0)`.
-   Cover the bound against its defining equation, monotonicity of the walk, the not-certifiable path
-   below `min_calibration_size`, JSON round trip, and the option-mismatch guard in `QuestionGate.apply`.
-5. Add the test file to `.github/workflows/ci.yml` alongside the other direct invocations.
-6. README section and a BENCHMARKS.md table. This is the part that turns the work into a
-   competitive claim, so write it only after step 1 lands.
+**Every number in `research/conformal/` is synthetic.** The bound is distribution-free, so
+that is sound for validating the guarantee — validity cannot depend on the generator. It is
+*not* evidence about coverage on real traffic. What `alpha = 0.02` costs in kept traffic on
+an actual ticket queue is unmeasured, and that is the number a buyer will ask for first.
 
 ## Not started
 
-`Agent.predict(gate=...)` convenience wiring, a `/v1/systemone` gate parameter in `laya/serve.py`,
-CLI surface, and a `LayaGate` LangChain runnable. All straightforward once the guarantee is settled.
+- `Agent.predict(gate=...)` convenience wiring (the `Router`/serve path covers the real use).
+- A `LayaGate` LangChain runnable, alongside the existing `LayaRouter` / `LayaGuardrail`.
+- Drift detection, per above.
+- Real-traffic coverage numbers on a public dataset with labels, to replace the synthetic
+  coverage column in `BENCHMARKS.md`.
