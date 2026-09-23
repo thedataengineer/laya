@@ -76,6 +76,8 @@ most `delta`. The guarantee language is safe to ship.
 | `tests/test_conformal.py` | 152 checks, runs in ~1.2 s |
 | `tests/test_serve.py` | 7 new gating tests |
 | `tests/test_cli.py` | 11 new gating tests |
+| `laya/drift.py` | `GateMonitor`: label-free expiry detection over a fitted gate |
+| `tests/test_drift.py` | 76 checks, runs in ~0.7 s |
 | `research/conformal/` | validation harness and its results |
 | `README.md`, `BENCHMARKS.md` | the competitive claim, with the evidence behind it |
 
@@ -89,12 +91,21 @@ Full suite: 29 of 31 files pass. The two that do not are environmental and pre-e
 
 ## Where the risk actually sits now
 
-**Exchangeability, not the bound.** The bound holds for any distribution, but calibration
-and serving traffic have to be drawn from the same one. A gate fitted on last quarter's
-tickets carries no guarantee on this quarter's if the mix moved, and nothing in the module
-detects that. The gate is JSON and holds no weights, so refitting is cheap — but somebody
-has to decide when. **A drift check that tells an operator their gate has expired is the
-next thing worth building**, and it is a product feature, not a research one.
+**Exchangeability, and now it is watched.** The bound holds for any distribution, but
+calibration and serving traffic have to be drawn from the same one. `laya/drift.py` closes
+this with two label-free tests: an exact two-sided binomial test of the observed acceptance
+rate against the calibrated coverage, and a two-sample KS test of live scores against the
+101-quantile sketch now stored in each gate's diagnostics.
+
+Measured, because a monitor that cries wolf gets muted: **0.3% false positives** on
+undrifted traffic against a 1% test level, and it catches a 2.2 → 2.0 shift in logit
+separation in 136 of 150 windows, 150/150 at 1.8 and beyond. Both numbers are asserted in
+`tests/test_drift.py`, not just measured once.
+
+The limit is stated everywhere it is reported, including in `report()` itself: both tests
+watch *scores*. A shift in the score-to-correctness link — same confidences, worse answers
+— moves real risk while leaving both quiet. A clean report is "no evidence of expiry",
+never "the guarantee still holds".
 
 **Every number in `research/conformal/` is synthetic.** The bound is distribution-free, so
 that is sound for validating the guarantee — validity cannot depend on the generator. It is
@@ -103,8 +114,11 @@ an actual ticket queue is unmeasured, and that is the number a buyer will ask fo
 
 ## Not started
 
+- **Correctness-link drift**, the half `GateMonitor` cannot see. Detecting it needs labels,
+  but not many: a small periodically-labelled audit sample would let the monitor test
+  observed risk against `alpha` directly, turning "no evidence of expiry" into a real
+  statement about the guarantee. This is the highest-value remaining item.
 - `Agent.predict(gate=...)` convenience wiring (the `Router`/serve path covers the real use).
 - A `LayaGate` LangChain runnable, alongside the existing `LayaRouter` / `LayaGuardrail`.
-- Drift detection, per above.
 - Real-traffic coverage numbers on a public dataset with labels, to replace the synthetic
   coverage column in `BENCHMARKS.md`.

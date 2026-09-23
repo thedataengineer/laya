@@ -79,6 +79,7 @@ jobs:
           python tests/test_mcp.py
           python tests/test_langchain.py
           python tests/test_conformal.py
+          python tests/test_drift.py
           python tests/test_load_errors.py
 
       # test_serve.py and test_truncation_direction.py are pure pytest modules: run as

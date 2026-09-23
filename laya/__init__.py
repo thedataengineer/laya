@@ -44,6 +44,7 @@ _LAZY_ATTRS = {
     "miss_threshold": (".conformal", "miss_threshold"),
     "min_calibration_size": (".conformal", "min_calibration_size"),
     "binomial_upper_bound": (".conformal", "binomial_upper_bound"),
+    "GateMonitor": (".drift", "GateMonitor"),
 }
 
 
@@ -101,5 +102,6 @@ __all__ = [
     "miss_threshold",
     "min_calibration_size",
     "binomial_upper_bound",
+    "GateMonitor",
     "__version__",
 ]

@@ -76,6 +76,7 @@ __all__ = [
     "min_calibration_size",
     "conformal_quantile",
     "SUPPORTED_MODES",
+    "gate_score",
 ]
 
 # Modes a question can be gated with. `auto` picks by question type.
@@ -158,6 +159,26 @@ def min_calibration_size(alpha: float, delta: float) -> int:
     if not (0.0 < alpha < 1.0) or not (0.0 < delta < 1.0):
         raise ValueError("alpha and delta must both lie in (0, 1)")
     return int(math.ceil(math.log(delta) / math.log(1.0 - alpha)))
+
+
+_SKETCH_LEVELS = np.round(np.linspace(0.0, 1.0, 101), 5)
+
+
+def _sketch(scores: np.ndarray) -> Dict[str, Any]:
+    """A compact, JSON-safe summary of a calibration score distribution.
+
+    101 quantiles, about a kilobyte, enough for a two-sample test against live traffic
+    without shipping the calibration set itself -- which would defeat the point of a gate
+    that travels as JSON. The 1% quantile spacing bounds how finely the reference CDF can
+    be resolved, and :mod:`laya.drift` accounts for that rather than pretending it is exact.
+    """
+    scores = np.asarray(scores, dtype=np.float64).ravel()
+    return {
+        "n": int(scores.size),
+        "levels": [float(x) for x in _SKETCH_LEVELS],
+        "quantiles": [float(x) for x in np.quantile(scores, _SKETCH_LEVELS)],
+        "mean": float(scores.mean()),
+    }
 
 
 def selective_threshold(scores: np.ndarray, correct: np.ndarray, alpha: float,
@@ -490,6 +511,7 @@ class QuestionGate:
                 "certifiable": fit["certifiable"],
                 "base_accuracy": float(correct.mean()),
                 "min_calibration": min_calibration_size(alpha, delta),
+                "score_sketch": _sketch(scores),
             }
             if not fit["certifiable"]:
                 diagnostics["shortfall"] = fit["shortfall"]
@@ -506,6 +528,7 @@ class QuestionGate:
                 "risk_bound": fit["risk_bound"],
                 "n_positive": fit["n_positive"],
                 "certifiable": fit["certifiable"],
+                "score_sketch": _sketch(probs[:, 1]),
             }
             params = {"threshold": fit["threshold"]}
 
@@ -521,6 +544,7 @@ class QuestionGate:
                 "singleton_rate": float((sizes == 1).mean()),
                 "feasible": feasible,
                 "min_calibration_for_alpha": int(math.ceil(1.0 / alpha) - 1),
+                "score_sketch": _sketch(probs.max(axis=1)),
             }
             params = {"qhat": qhat, "method": set_method}
 
@@ -540,6 +564,7 @@ class QuestionGate:
                 "median_abs_error": float(np.median(residuals)),
                 "feasible": feasible,
                 "min_calibration_for_alpha": int(math.ceil(1.0 / alpha) - 1),
+                "score_sketch": _sketch(expected),
             }
             params = {"half_width": qhat, "levels": int(probs.shape[1])}
 
@@ -1022,3 +1047,19 @@ class ConformalGate:
 def _certified(gate: QuestionGate) -> bool:
     d = gate.diagnostics
     return bool(d.get("certifiable", d.get("feasible", True)))
+
+
+def gate_score(gate: "QuestionGate", answer: Mapping[str, Any]) -> float:
+    """The single number ``gate`` thresholds this answer on.
+
+    Drift monitoring needs the same quantity the gate was fitted against, and only the
+    gate knows which one that is: top probability for ``selective`` and ``set``, P(true)
+    for ``miss``, the expected level for ``interval``. Deriving it anywhere else is how
+    a monitor ends up watching a distribution the gate does not use.
+    """
+    qtype, keys, p = _answer_distribution(answer)
+    if gate.mode == "miss":
+        return float(p[1])
+    if gate.mode == "interval":
+        return float((p * np.arange(p.size, dtype=np.float64)).sum())
+    return float(p.max())

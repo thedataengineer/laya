@@ -612,6 +612,58 @@ intent      : ACCEPT     at most 0.02 of all decisions are accepted and wrong, w
 record      : at most 0.02 of accepted records are wrong on at least one of the 1 gated questions, with confidence 0.95 (union bound)
 ```
 
+### A gate with no expiry date is a guarantee someone will keep quoting
+
+The bound is distribution-free but not distribution-*proof*. It needs exchangeability:
+calibration and live traffic drawn from the same distribution. A gate fitted on last
+quarter's tickets carries no guarantee on this quarter's if the mix moved — and nothing in
+the gate itself notices.
+
+`GateMonitor` does, without labels:
+
+```python
+from laya import ConformalGate, GateMonitor
+
+gate = ConformalGate.load("triage_gate.json")
+monitor = GateMonitor(gate)
+
+for ticket in stream:
+    monitor.observe(gate.apply(agent.predict(ticket, questions)))
+
+if monitor.check()["status"] == "expired":
+    page_whoever_owns_the_labels(monitor.report())
+```
+
+```
+Laya gate drift  status=expired  seen=1000  window=1000  level=0.005 per test
+
+question               mode       status    acceptance       scores
+-------------------------------------------------------------------
+intent                 selective  expired   45.1% vs 72.4%   KS=0.287 p=1.1e-54
+
+  intent: acceptance rate moved from 72.4% to 45.1% (p=1.6e-73); score distribution
+          shifted (KS=0.287, p=1.1e-54)
+
+  Refit on freshly labelled traffic before quoting the guarantee again.
+```
+
+Two tests, neither needing a single label. The gate was fitted to accept a known share of
+traffic, so an **exact two-sided binomial** test against that calibrated coverage catches a
+shifted input distribution outright. A **two-sample KS** test against the 101-quantile
+sketch stored in the gate catches shifts that leave the acceptance rate unchanged — mass
+moving *within* the accepted region, which the binomial test cannot see.
+
+Measured false-positive rate on undrifted traffic: **0.3%** against a 1% test level. It
+catches a 9% change in logit separation 91% of the time, and anything larger essentially
+always. A monitor that cries wolf gets muted, which is worse than not having one, so that
+number is tested in CI rather than asserted here.
+
+**What it cannot tell you, and the distinction matters.** Both tests watch the *scores*. A
+shift in the score-to-correctness link — same confidences, worse answers — moves real risk
+while leaving both tests quiet. A clean report means "no evidence the gate has expired",
+never "the gate still holds". Only refitting on freshly labelled data restores the
+guarantee; this tells you when that is overdue.
+
 ### Is the bound real?
 
 It is a falsifiable claim, so it has been falsification-tested: 1,000 trials per
