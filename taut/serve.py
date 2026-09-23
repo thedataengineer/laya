@@ -44,6 +44,7 @@ deferred into the functions that need them, so ``import taut.serve`` stays cheap
 and touches no GPU -- which is what keeps the Nix ``pythonImportsCheck`` honest.
 """
 import os
+import sys
 from typing import Any, Dict, Optional
 
 # The three checkpoint names the router understands; used to decide whether a
@@ -241,7 +242,23 @@ def create_app(router: Optional[Any] = None, risk_gate: Optional[Any] = None):
     return app
 
 
-def main() -> None:
+def main(argv=None) -> None:
+    # Configuration is entirely environmental, so there are no flags -- but `--help` has
+    # to answer rather than boot a server on 0.0.0.0, which is what it did before.
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args:
+        if args[0] in ("-h", "--help"):
+            print(__doc__.strip())
+            return
+        if args[0] in ("-V", "--version"):
+            from . import __version__
+
+            print("taut-serve %s" % __version__)
+            return
+        print("taut-serve takes no arguments; it is configured through the environment.\n"
+              "Run `taut-serve --help` for the full list.", file=sys.stderr)
+        raise SystemExit(2)
+
     import uvicorn
 
     uvicorn.run(

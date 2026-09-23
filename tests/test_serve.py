@@ -324,3 +324,32 @@ def test_gate_is_not_a_request_field(monkeypatch, tmp_path):
     client = TestClient(create_app(router=FakeRouter()))
     body = client.post("/v1/systemone", json=dict(REQ, alpha=0.5, gate={"alpha": 0.5})).json()
     assert body["answers"]["dept"]["gate"]["alpha"] == 0.02
+
+
+# ---------------------------------------------------------------- the entry point
+# `taut-serve --help` used to boot a server on 0.0.0.0 rather than answer, because
+# configuration is environmental and main() took no arguments at all.
+
+def test_help_prints_the_env_table_instead_of_serving(capsys):
+    from taut.serve import main
+
+    main(["--help"])
+    out = capsys.readouterr().out
+    assert "TAUT_GATE" in out and "TAUT_PORT" in out
+
+
+def test_version(capsys):
+    from taut import __version__
+    from taut.serve import main
+
+    main(["--version"])
+    assert __version__ in capsys.readouterr().out
+
+
+def test_an_unknown_flag_exits_rather_than_serving(capsys):
+    from taut.serve import main
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--port", "9000"])
+    assert excinfo.value.code == 2
+    assert "configured through the environment" in capsys.readouterr().err
