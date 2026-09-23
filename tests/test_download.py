@@ -22,8 +22,8 @@ from tokenizers import Tokenizer  # noqa: E402
 from tokenizers.models import WordLevel  # noqa: E402
 from transformers import BertConfig, BertModel, PreTrainedTokenizerFast  # noqa: E402
 
-from laya import load  # noqa: E402
-from laya.common import DecisionModel  # noqa: E402
+from taut import load  # noqa: E402
+from taut.common import DecisionModel  # noqa: E402
 
 
 class DownloadTests(unittest.TestCase):
@@ -97,7 +97,7 @@ class DownloadTests(unittest.TestCase):
             self.assertEqual(set(downloaded), {prefix + name for name in self.runtime_files})
 
     def test_default_english_does_not_download_sibling_checkpoints(self):
-        self.check_download("convaiinnovations/laya")
+        self.check_download("thekarteek/taut")
 
     def test_custom_root_checkpoint(self):
         self.check_download("test/custom-model")

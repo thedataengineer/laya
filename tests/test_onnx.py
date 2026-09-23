@@ -5,12 +5,12 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from laya.agent import Agent
+from taut.agent import Agent
 
 # Skip the test if onnx isn't installed
 try:
     import onnxruntime
-    from laya.onnx_agent import ONNXAgent
+    from taut.onnx_agent import ONNXAgent
     from scripts.export_onnx import export_to_onnx
     HAS_ONNX = True
 except ImportError:
@@ -21,10 +21,10 @@ import pytest
 @pytest.mark.skipif(not HAS_ONNX, reason="onnx and onnxruntime are required")
 def test_onnx_numerical_parity():
     """Verify that PyTorch and ONNX agents produce identical outputs for all 3 question types."""
-    model_id = "convaiinnovations/laya"
+    model_id = "thekarteek/taut"
     
     with tempfile.TemporaryDirectory() as tmpdir:
-        onnx_path = os.path.join(tmpdir, "laya.onnx")
+        onnx_path = os.path.join(tmpdir, "taut.onnx")
         
         # 1. Export to ONNX
         export_to_onnx(model_id, onnx_path)

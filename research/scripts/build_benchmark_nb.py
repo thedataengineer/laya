@@ -1,8 +1,8 @@
-"""Emit laya_benchmark_colab.ipynb: an extensive head-to-head benchmark of
-convaiinnovations/laya (ModernBERT-large, English) vs convaiinnovations/laya-multilingual
+"""Emit taut_benchmark_colab.ipynb: an extensive head-to-head benchmark of
+thekarteek/taut (ModernBERT-large, English) vs thekarteek/taut-multilingual
 (mmBERT-base, 100+ languages), on a Colab T4.
 
-Writes one laya_benchmark_results.json that can be handed back for analysis.
+Writes one taut_benchmark_results.json that can be handed back for analysis.
 """
 import json
 import os
@@ -21,12 +21,12 @@ def code(t):
 
 CELLS = [
     md("""
-# Laya vs Laya-Multilingual — extensive head-to-head benchmark
+# Taut vs Taut-Multilingual — extensive head-to-head benchmark
 
 Runs both open checkpoints over the same questions and writes a single
-`laya_benchmark_results.json`.
+`taut_benchmark_results.json`.
 
-| | `convaiinnovations/laya` | `convaiinnovations/laya-multilingual` |
+| | `thekarteek/taut` | `thekarteek/taut-multilingual` |
 |---|---|---|
 | encoder | ModernBERT-large (English) | mmBERT-base (100+ languages) |
 | params | 421.3M (394.8M enc + 26.5M head) | 321.9M (306.9M enc + 15.0M head) |
@@ -40,7 +40,7 @@ Runs both open checkpoints over the same questions and writes a single
 3. **English zero-shot** — SST-5, emotion, prompt-injections, plus banking77 as a 77-option stress test.
 4. **Latency** — p50/p95 at 1 / 5 / 10 / 50 questions per call.
 5. **Option-order robustness** — how often the answer flips when the options are permuted (the independent Jev benchmark measured 13% for Jev; worst LLM 37%).
-6. **Calibration repair** — ECE before and after refitting temperature, which matters because `laya-multilingual` shipped uncalibrated.
+6. **Calibration repair** — ECE before and after refitting temperature, which matters because `taut-multilingual` shipped uncalibrated.
 
 **Setup:** Runtime → Change runtime type → **T4 GPU**. Then Run All (~25–40 min).
 Both models see byte-identical questions (fixed seed), so every difference is the model.
@@ -59,28 +59,28 @@ assert torch.cuda.is_available(), "Enable the T4 GPU runtime before running."
 
     md("## 2. Dependencies"),
     code("""
-!pip -q install -U "laya>=0.1.6" "transformers>=4.45" "datasets>=3.0" safetensors huggingface_hub 2>&1 | tail -3
-import laya, transformers, datasets
-print("laya", getattr(laya, "__version__", "?"), "| transformers", transformers.__version__, "| datasets", datasets.__version__)
+!pip -q install -U "taut>=0.1.6" "transformers>=4.45" "datasets>=3.0" safetensors huggingface_hub 2>&1 | tail -3
+import taut, transformers, datasets
+print("taut", getattr(taut, "__version__", "?"), "| transformers", transformers.__version__, "| datasets", datasets.__version__)
 """),
 
     md("""## 3. Download both checkpoints
 
-`reference_compile` is forced off after loading: the `laya` package does not disable it (only
+`reference_compile` is forced off after loading: the `taut` package does not disable it (only
 `rl_agent_api.py` does), and torch.compile is a loss on small batches / few SMs like a T4."""),
     code("""
 import torch, json, os, time
 from huggingface_hub import snapshot_download
 from safetensors import safe_open
 
-REPOS = {"laya": "convaiinnovations/laya", "laya-multilingual": "convaiinnovations/laya-multilingual"}
+REPOS = {"taut": "thekarteek/taut", "taut-multilingual": "thekarteek/taut-multilingual"}
 PATHS, MODEL_META = {}, {}
 
 def patch_tokenizer_config(model_dir):
-    '''laya-multilingual ships extra_special_tokens as a LIST (inherited from the mmBERT/Gemma
+    '''taut-multilingual ships extra_special_tokens as a LIST (inherited from the mmBERT/Gemma
     tokenizer); transformers expects a dict and raises
     AttributeError: list object has no attribute keys. Without this, AutoTokenizer -- and so
-    laya.load() -- fails outright on that repo. Also normalises tokenizer_class for 4.x/5.x.'''
+    taut.load() -- fails outright on that repo. Also normalises tokenizer_class for 4.x/5.x.'''
     p = os.path.join(model_dir, "tokenizer", "tokenizer_config.json")
     if not os.path.exists(p):
         return []
@@ -127,8 +127,8 @@ for name, repo in REPOS.items():
     print("   ", json.dumps({k: v for k, v in MODEL_META[name].items() if k != "temperature_by_options"}))
 
 def load_agent(name):
-    import laya
-    ag = laya.load(PATHS[name], device="cuda")
+    import taut
+    ag = taut.load(PATHS[name], device="cuda")
     try:
         ag.model.encoder.config.reference_compile = False   # torch.compile hurts on T4-class GPUs
     except Exception as e:
@@ -143,7 +143,7 @@ def load_agent(name):
 import json, math, sys, time
 import numpy as np
 import torch
-from laya.common import QTYPES, build_sequence, collate_items, render_options, temp_bucket
+from taut.common import QTYPES, build_sequence, collate_items, render_options, temp_bucket
 
 def to_internal(qdef):
     t = qdef["type"]
@@ -402,7 +402,7 @@ for lg in XNLI_LANGS:
 
     md("""### 5c. English tasks
 
-`sst5`, `emotion` and `prompt_injections` were held out of Laya's training entirely (true
+`sst5`, `emotion` and `prompt_injections` were held out of Taut's training entirely (true
 zero-shot). `ag_news` and `boolq` were in the training mix, so they measure retention rather
 than generalisation. `banking77` is the many-option stress test — 77 options at once, versus
 Jev's documented hard cap at 255."""),
@@ -567,14 +567,14 @@ for model_name in REPOS:
     globals()["AGENT_" + model_name.replace("-", "_")] = agent
     gc.collect(); torch.cuda.empty_cache()
 
-json.dump(RESULTS, open("laya_benchmark_results.json", "w"), indent=2)
+json.dump(RESULTS, open("taut_benchmark_results.json", "w"), indent=2)
 print("\\ncheckpoint saved")
 """),
 
     md("""### 6b. Control — matched context budget
 
 The two checkpoints ship different context windows (512 vs 1024 tokens), so on long states
-`laya-multilingual` sees more of the input. This re-runs typed-decisions with **both** models
+`taut-multilingual` sees more of the input. This re-runs typed-decisions with **both** models
 capped at 512 tokens, isolating the architecture from the context-window advantage."""),
     code("""
 import bench_engine as BE
@@ -678,7 +678,7 @@ for model_name in REPOS:
 
     md("""## 9. Calibration repair
 
-`laya-multilingual` ships with `temperature = [1.0, 1.0, 1.0]` and no per-option-count buckets —
+`taut-multilingual` ships with `temperature = [1.0, 1.0, 1.0]` and no per-option-count buckets —
 it was never calibrated. This refits one temperature per (question type, option-count bucket) on
 **half** of each suite and reports ECE on the other half, so the improvement is measured
 out-of-sample. It shows how much of any calibration gap is a missing post-processing step rather
@@ -686,7 +686,7 @@ than a property of the model."""),
     code("""
 import numpy as np
 import bench_engine as BE
-from laya.common import temp_bucket
+from taut.common import temp_bucket
 
 RESULTS["calibration_repair"] = {}
 for model_name in REPOS:
@@ -751,11 +751,11 @@ def agg(prefix_or_family, key="family"):
     return out
 
 RESULTS["caveats"] = {
-    "context_window": "laya max_len=512, laya-multilingual max_len=1024 (shipped configs). "
+    "context_window": "taut max_len=512, taut-multilingual max_len=1024 (shipped configs). "
                       "See typed_decisions_matched_512 for the equal-budget control.",
-    "shipped_calibration": "laya ships fitted temperatures; laya-multilingual ships all-1.0 "
+    "shipped_calibration": "taut ships fitted temperatures; taut-multilingual ships all-1.0 "
                            "(uncalibrated). See calibration_repair for the out-of-sample refit.",
-    "training_overlap": "ag_news and boolq were in Laya's training mix (retention, not generalisation). "
+    "training_overlap": "ag_news and boolq were in Taut's training mix (retention, not generalisation). "
                         "sst5, emotion, prompt_injections, banking77 were held out. "
                         "Neither checkpoint trained on typed-decisions, MASSIVE or XNLI.",
 }
@@ -785,9 +785,9 @@ for fam in ("massive_intent", "massive_scenario", "xnli"):
         if na: non[m] = round(float(np.mean(na)), 4)
     RESULTS["summary"][fam + "_english_vs_rest"] = {"english": en, "non_english": non}
 
-json.dump(RESULTS, open("laya_benchmark_results.json", "w"), indent=2)
+json.dump(RESULTS, open("taut_benchmark_results.json", "w"), indent=2)
 print(json.dumps(RESULTS["summary"], indent=2))
-print("\\nwrote laya_benchmark_results.json  (%.1f KB)" % (os.path.getsize("laya_benchmark_results.json")/1024))
+print("\\nwrote taut_benchmark_results.json  (%.1f KB)" % (os.path.getsize("taut_benchmark_results.json")/1024))
 """),
 
     code("""
@@ -798,11 +798,11 @@ for fam in ("massive_intent", "massive_scenario", "xnli"):
     if not langs:
         continue
     print("\\n=== %s : accuracy by language ===" % fam)
-    print("%-8s %12s %22s %10s" % ("lang", "laya", "laya-multilingual", "delta"))
+    print("%-8s %12s %22s %10s" % ("lang", "taut", "taut-multilingual", "delta"))
     for lg in langs:
         sname = "%s.%s" % (fam, lg)
-        a = RESULTS["suites"].get(sname, {}).get("laya", {}).get("calibrated", {}).get("accuracy")
-        b = RESULTS["suites"].get(sname, {}).get("laya-multilingual", {}).get("calibrated", {}).get("accuracy")
+        a = RESULTS["suites"].get(sname, {}).get("taut", {}).get("calibrated", {}).get("accuracy")
+        b = RESULTS["suites"].get(sname, {}).get("taut-multilingual", {}).get("calibrated", {}).get("accuracy")
         if a is None or b is None:
             continue
         print("%-8s %12.3f %22.3f %+10.3f" % (lg, a, b, b-a))
@@ -811,9 +811,9 @@ for fam in ("massive_intent", "massive_scenario", "xnli"):
     code("""
 try:
     from google.colab import files
-    files.download("laya_benchmark_results.json")
+    files.download("taut_benchmark_results.json")
 except Exception as e:
-    print("Not on Colab or download blocked (%s). Grab laya_benchmark_results.json from the file browser." % type(e).__name__)
+    print("Not on Colab or download blocked (%s). Grab taut_benchmark_results.json from the file browser." % type(e).__name__)
 """),
 ]
 
@@ -830,7 +830,7 @@ def main():
         "nbformat": 4,
         "nbformat_minor": 0,
     }
-    out = os.path.join(HERE, "laya_benchmark_colab.ipynb")
+    out = os.path.join(HERE, "taut_benchmark_colab.ipynb")
     with open(out, "w") as f:
         json.dump(nb, f, indent=1)
     print("wrote %s (%d cells)" % (out, len(CELLS)))

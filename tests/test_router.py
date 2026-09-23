@@ -7,9 +7,9 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from laya.common import QTYPES, TEMP_MAX, TEMP_MIN, clamp_temperature, temp_bucket  # noqa: E402
-from laya.lang import analyse, detect_script, guess_latin_language, is_english, state_text  # noqa: E402
-from laya.router import (  # noqa: E402
+from taut.common import QTYPES, TEMP_MAX, TEMP_MIN, clamp_temperature, temp_bucket  # noqa: E402
+from taut.lang import analyse, detect_script, guess_latin_language, is_english, state_text  # noqa: E402
+from taut.router import (  # noqa: E402
     BUNDLE_REPO,
     DEFAULT_MODELS,
     STANDALONE_MODELS,
@@ -185,10 +185,10 @@ check("workflow/empty", match_typed_decisions_workflow({}), None)
 
 
 # --------------------------------------------------------------------- name normalisation
-for alias, want in [("en", "english"), ("laya", "english"), ("multi", "multilingual"),
+for alias, want in [("en", "english"), ("taut", "english"), ("multi", "multilingual"),
                     ("ML", "multilingual"), ("typed", "typed-decisions"),
                     ("typed_decisions", "typed-decisions"), ("English", "english"),
-                    ("convaiinnovations/laya".split("/")[-1], "english")]:
+                    ("thekarteek/taut".split("/")[-1], "english")]:
     check("alias/" + alias, normalise_name(alias), want)
 try:
     normalise_name("nope")
@@ -273,17 +273,17 @@ check("route/explicit beats workflow",
 # An auto-detected workflow reports `repo` like every other branch does. It used to hand back the raw
 # (repo, subfolder) spec, which serialises to a JSON list instead of the "repo/subfolder" string.
 check("route/auto workflow repo is a string",
-      r_auto.route({"body": "I was charged twice"}, Q_TD)["repo"], "convaiinnovations/laya/typed-decisions")
+      r_auto.route({"body": "I was charged twice"}, Q_TD)["repo"], "thekarteek/taut/typed-decisions")
 check("route/auto workflow repo matches explicit task",
       r_auto.route({"body": "I was charged twice"}, Q_TD)["repo"],
       r_auto.route({"body": "I was charged twice"}, Q_TD, task="typed_decisions")["repo"])
 check("route/auto workflow repo standalone",
       Router(auto_task_detection=True, standalone_repos=True).route({"body": "x"}, Q_TD)["repo"],
-      "convaiinnovations/laya-typed-decisions")
+      "thekarteek/taut-typed-decisions")
 
 # decision payload shape
 d = r.route({"body": "मुझसे दो बार शुल्क लिया गया"}, Q_GENERIC)
-check("decision/has repo", d["repo"], "convaiinnovations/laya/multilingual")
+check("decision/has repo", d["repo"], "thekarteek/taut/multilingual")
 check("decision/has reason", isinstance(d["reason"], str) and len(d["reason"]) > 0, True)
 check("decision/detection script", d["detection"]["script"], "devanagari")
 check("decision/.model property", d.model, "multilingual")
@@ -455,7 +455,7 @@ for text in [
     check("route/banglish control " + text[:32], _r_lat.route(text).model, "english")
 # ...and no other language may move either: the `bn` list claims no word another list holds, and
 # leaves out Romance words such as `ora`, `nei`, `vai`.
-from laya.lang import _STOP  # noqa: E402
+from taut.lang import _STOP  # noqa: E402
 check("latin_lang/bn list shares no word with another list",
       sorted(w for w in _STOP.get("bn", ()) for lg, words in _STOP.items() if lg != "bn" and w in words), [])
 check("latin_lang/romanian with ei stays romanian",
@@ -572,18 +572,18 @@ check("lru/single-language traffic builds one checkpoint", built, ["english"])
 check("bundle/english is repo root", DEFAULT_MODELS["english"], (BUNDLE_REPO, None))
 check("bundle/multilingual subfolder", DEFAULT_MODELS["multilingual"], (BUNDLE_REPO, "multilingual"))
 check("bundle/typed subfolder", DEFAULT_MODELS["typed-decisions"], (BUNDLE_REPO, "typed-decisions"))
-check("repo_str/root", _repo_str((BUNDLE_REPO, None)), "convaiinnovations/laya")
-check("repo_str/sub", _repo_str((BUNDLE_REPO, "multilingual")), "convaiinnovations/laya/multilingual")
+check("repo_str/root", _repo_str((BUNDLE_REPO, None)), "thekarteek/taut")
+check("repo_str/sub", _repo_str((BUNDLE_REPO, "multilingual")), "thekarteek/taut/multilingual")
 check("repo_str/plain string", _repo_str("some/repo"), "some/repo")
 
 r_bundle = Router()
 r_alone = Router(standalone_repos=True)
 check("bundle/default router uses bundle",
-      r_bundle.route({"m": "मुझसे दो बार"}, Q_GENERIC)["repo"], "convaiinnovations/laya/multilingual")
+      r_bundle.route({"m": "मुझसे दो बार"}, Q_GENERIC)["repo"], "thekarteek/taut/multilingual")
 check("standalone/opt-in uses own repo",
-      r_alone.route({"m": "मुझसे दो बार"}, Q_GENERIC)["repo"], "convaiinnovations/laya-multilingual")
+      r_alone.route({"m": "मुझसे दो बार"}, Q_GENERIC)["repo"], "thekarteek/taut-multilingual")
 check("standalone/english unchanged",
-      r_alone.route({"m": "I was charged twice"}, Q_GENERIC)["repo"], "convaiinnovations/laya")
+      r_alone.route({"m": "I was charged twice"}, Q_GENERIC)["repo"], "thekarteek/taut")
 check("standalone map complete", sorted(STANDALONE_MODELS), sorted(DEFAULT_MODELS))
 # a local-path override must still work (the Space and tests rely on it)
 r_local = Router(models={"english": "/tmp/en", "multilingual": "/tmp/ml"})
@@ -592,7 +592,7 @@ check("override/local path kept", r_local.route({"m": "मुझसे दो �
 
 # --------------------------------------------------------------------- preload
 # Exercise the real preload/load/LRU paths; only checkpoint construction is stubbed.
-with patch("laya.agent.Agent", side_effect=lambda repo, **kw: _Stub(repo)) as build:
+with patch("taut.agent.Agent", side_effect=lambda repo, **kw: _Stub(repo)) as build:
     rp = Router(preload=True)
     check("preload/all three stay resident", sorted(rp.loaded),
           ["english", "multilingual", "typed-decisions"])
@@ -673,7 +673,7 @@ check("attach/accepts aliases", stubbed_router(1).attach("en", _Stub("x")) is no
 
 def _concurrent_load_dedup():
     """Concurrent load() of the same checkpoint must build one Agent, shared by all callers."""
-    import laya.agent as _agent_mod
+    import taut.agent as _agent_mod
     constructions = []
     cl = threading.Lock()
 
@@ -712,7 +712,7 @@ check("threads/LRU views stay consistent", (order_len == 1 and agents == ["engli
 
 def _concurrent_hotpath():
     """Concurrent hot-path loads of an already-cached model must keep _order/_agents consistent."""
-    import laya.agent as _agent_mod
+    import taut.agent as _agent_mod
 
     class _Agent:
         def __init__(self, *args, **kwargs):

@@ -21,7 +21,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from laya.conformal import miss_threshold, selective_threshold  # noqa: E402
+from taut.conformal import miss_threshold, selective_threshold  # noqa: E402
 
 POOL = 2_000_000
 TRIALS = 1000

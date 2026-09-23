@@ -1,15 +1,15 @@
-"""Generate the Laya logo: SVG sources plus PNG renders.
+"""Generate the Taut logo: SVG sources plus PNG renders.
 
 The mark is one ring in two states. Half of it is an unbroken stroke; the other half breaks into
 points that shrink and fade, and the smallest point sits next to where the stroke begins again --
-so the eye closes the loop on its own.
+so the eye closes the loop on its own. A continuous stroke resolving into discrete points is what
+the model does: unstructured state in, a typed decision out.
 
-`laya` (लय) is Sanskrit for dissolution. The mark reads as that cycle: becoming and dissolving,
-neither one the end. It carries a second meaning specific to this project -- a continuous stroke
-resolving into discrete points is what the model does, turning unstructured state into a typed
-decision.
+The mark is inherited from Laya, where the dissolving ring read as `laya` (लय), Sanskrit for
+dissolution. `taut` keeps the geometry and re-reads it: a line under tension, closing exactly --
+a bound pulled tight, which is the thing this fork adds on top of the decision.
 
-  python3 notebooks/make_logo.py   ->  assets/logo-mark.svg  logo-mark.png
+  python3 assets/make_logo.py   ->  assets/logo-mark.svg  logo-mark.png
                                        assets/logo-lockup.svg  logo-lockup.png
                                        assets/logo-mark-mono.svg
 """
@@ -76,8 +76,8 @@ def dots(color):
 def mark_svg(color, use_current=False):
     c = "currentColor" if use_current else color
     return '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d"
-     width="%d" height="%d" role="img" aria-label="Laya">
-  <title>Laya</title>
+     width="%d" height="%d" role="img" aria-label="Taut">
+  <title>Taut</title>
   <desc>An open stroke whose end breaks into points that spiral inward and shrink to a single
   point: becoming, then dissolving into one.</desc>
   <g fill="none" stroke="none">
@@ -98,16 +98,16 @@ def lockup_svg(color, text=INK):
     s = 0.95                                   # mark scale inside the lockup
     tx, ty = 2, (h - SIZE * s) / 2
     return '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d"
-     width="%d" height="%d" role="img" aria-label="Laya">
-  <title>Laya</title>
+     width="%d" height="%d" role="img" aria-label="Taut">
+  <title>Taut</title>
   <g transform="translate(%.2f,%.2f) scale(%.3f)">
     <path d="%s" fill="none" stroke="%s" stroke-width="%.1f" stroke-linecap="round" opacity="0.95"/>
 %s
   </g>
   <text x="70" y="%d" font-family="DejaVu Sans, Helvetica Neue, Helvetica, Arial, sans-serif"
-        font-size="34" font-weight="600" letter-spacing="0.5" fill="%s">laya</text>
+        font-size="34" font-weight="600" letter-spacing="0.5" fill="%s">taut</text>
   <text x="71.5" y="%d" font-family="DejaVu Sans, Helvetica Neue, Helvetica, Arial, sans-serif"
-        font-size="10.5" letter-spacing="2.6" fill="%s" opacity="0.62">DECISIONS, NOT TEXT</text>
+        font-size="10.5" letter-spacing="2.6" fill="%s" opacity="0.62">DECISIONS, BOUNDED</text>
 </svg>
 ''' % (w, h, w, h, tx, ty, s, arc_path(), color, STROKE, dots(color), 42, text, 57, text)
 

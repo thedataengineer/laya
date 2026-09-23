@@ -11,7 +11,7 @@ concurrency:
 
 env:
   # transformers probes for TensorFlow at import; when TF is present its abseil runtime can
-  # deadlock model construction. Laya is torch-only.
+  # deadlock model construction. Taut is torch-only.
   USE_TF: "0"
   USE_TORCH: "1"
   TOKENIZERS_PARALLELISM: "false"
@@ -48,11 +48,11 @@ jobs:
           python -m pip install --upgrade pip
           # CPU-only torch keeps the job under a minute instead of pulling CUDA wheels
           pip install torch --index-url https://download.pytorch.org/whl/cpu
-          # Install with the mcp extra so laya[mcp] resolution and the laya.mcp layer are both exercised
+          # Install with the mcp extra so taut[mcp] resolution and the taut.mcp layer are both exercised
           pip install -e ".[mcp]"
 
       - name: Import check
-        run: python -c "import laya; print(laya.__version__); print(sorted(laya.__all__))"
+        run: python -c "import taut; print(taut.__version__); print(sorted(taut.__all__))"
 
       - name: Routing and language-detection tests
         run: |
@@ -122,7 +122,7 @@ jobs:
       # bash on this runner so the quoting rules match the Linux job; the default shell on a
       # Windows runner is PowerShell, where `python -c "...; ..."` is not the same command.
       - name: Import check
-        run: python -c "import laya; print(laya.__version__); print(sorted(laya.__all__))"
+        run: python -c "import taut; print(taut.__version__); print(sorted(taut.__all__))"
         shell: bash
 
       # Same suites as the Linux job. Guarded with -f so a suite added by another open branch
@@ -165,9 +165,9 @@ jobs:
           python-version: "3.11"
       - run: pip install ruff
       - name: Ruff
-        run: ruff check laya/ --select=E9,F63,F7,F82,F401,F811 --line-length=120
+        run: ruff check taut/ --select=E9,F63,F7,F82,F401,F811 --line-length=120
       - name: Byte-compile every module
-        run: python -m compileall -q laya/ tests/
+        run: python -m compileall -q taut/ tests/
 
   build:
     name: package

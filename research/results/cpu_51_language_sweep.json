@@ -3,7 +3,7 @@
     "timestamp": "2026-09-19 11:04:45",
     "device": "cpu",
     "torch": "2.8.0",
-    "laya": "0.2.0",
+    "taut": "0.2.0",
     "threads": 4
   },
   "part_a": {
@@ -1317,7 +1317,7 @@
         "ece": 0.144,
         "score_mae": 0.391,
         "ms_per_case": 710,
-        "source": "figure quoted in the laya repo's own comparison table"
+        "source": "figure quoted in the taut repo's own comparison table"
       },
       "teacher_self_agreement_ceiling": {
         "accuracy": 0.735

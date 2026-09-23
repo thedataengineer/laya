@@ -1,11 +1,11 @@
 # Handoff: certified risk control
 
-Branch `feat/conformal-risk-control`. `laya/conformal.py` plus its wiring into the package,
+Branch `feat/conformal-risk-control`. `taut/conformal.py` plus its wiring into the package,
 the HTTP server, the CLI, the test suite and CI. Version bumped to 0.4.0.
 
 ## Why this exists
 
-Laya's headline claim is calibration: ECE 0.081 against Jev's 0.246. On its own that number
+Taut's headline claim is calibration: ECE 0.081 against Jev's 0.246. On its own that number
 is marketing — a caller still has to guess a confidence threshold by hand, and nothing tells
 them what the guess costs. This module converts the calibrated probability into a contract
 someone can be held to: "at most 2% of the queue is auto-handled incorrectly, at 95%
@@ -69,14 +69,14 @@ most `delta`. The guarantee language is safe to ship.
 
 | | |
 |---|---|
-| `laya/conformal.py` | four modes: `selective`, `miss`, `set`, `interval` |
-| `laya/__init__.py` | lazy exports; `import laya` stays torch-free, and so does applying a gate |
-| `laya/serve.py` | `LAYA_GATE`, `LAYA_GATE_STRICT`, contract advertised on `GET /health` |
-| `laya/cli.py` | `--gate PATH`, `--report` |
+| `taut/conformal.py` | four modes: `selective`, `miss`, `set`, `interval` |
+| `taut/__init__.py` | lazy exports; `import taut` stays torch-free, and so does applying a gate |
+| `taut/serve.py` | `TAUT_GATE`, `TAUT_GATE_STRICT`, contract advertised on `GET /health` |
+| `taut/cli.py` | `--gate PATH`, `--report` |
 | `tests/test_conformal.py` | 152 checks, runs in ~1.2 s |
 | `tests/test_serve.py` | 7 new gating tests |
 | `tests/test_cli.py` | 11 new gating tests |
-| `laya/drift.py` | `GateMonitor`: label-free expiry detection over a fitted gate |
+| `taut/drift.py` | `GateMonitor`: label-free expiry detection over a fitted gate |
 | `tests/test_drift.py` | 76 checks, runs in ~0.7 s |
 | `research/conformal/` | validation harness and its results |
 | `README.md`, `BENCHMARKS.md` | the competitive claim, with the evidence behind it |
@@ -87,19 +87,19 @@ which always covers.
 
 Full suite: 29 of 31 files pass. The two that do not are environmental and pre-existing —
 `test_fast.py` needs CUDA, `test_local_e2e.py` needs locally trained weights at
-`~/laya_models`. Neither is in CI.
+`~/taut_models`. Neither is in CI.
 
 ## Where the risk actually sits now
 
 **Exchangeability, and now it is watched.** The bound holds for any distribution, but
-calibration and serving traffic have to be drawn from the same one. `laya/drift.py` closes
+calibration and serving traffic have to be drawn from the same one. `taut/drift.py` closes
 this with two label-free tests: an exact two-sided binomial test of the observed acceptance
 rate against the calibrated coverage, and a two-sample KS test of live scores against the
 101-quantile sketch now stored in each gate's diagnostics.
 
-Measured, because a monitor that cries wolf gets muted: **0.3% false positives** on
+Measured, because a monitor that cries wolf gets muted: **0.7% false positives** on
 undrifted traffic against a 1% test level, and it catches a 2.2 → 2.0 shift in logit
-separation in 136 of 150 windows, 150/150 at 1.8 and beyond. Both numbers are asserted in
+separation in 137 of 150 windows, 150/150 at 1.8 and beyond. Both numbers are asserted in
 `tests/test_drift.py`, not just measured once.
 
 The limit is stated everywhere it is reported, including in `report()` itself: both tests
@@ -119,6 +119,6 @@ an actual ticket queue is unmeasured, and that is the number a buyer will ask fo
   observed risk against `alpha` directly, turning "no evidence of expiry" into a real
   statement about the guarantee. This is the highest-value remaining item.
 - `Agent.predict(gate=...)` convenience wiring (the `Router`/serve path covers the real use).
-- A `LayaGate` LangChain runnable, alongside the existing `LayaRouter` / `LayaGuardrail`.
+- A `TautGate` LangChain runnable, alongside the existing `TautRouter` / `TautGuardrail`.
 - Real-traffic coverage numbers on a public dataset with labels, to replace the synthetic
   coverage column in `BENCHMARKS.md`.

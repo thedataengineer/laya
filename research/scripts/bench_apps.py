@@ -1,12 +1,12 @@
-"""Application-workflow benchmark for the Laya checkpoints, plus the tasks where public
+"""Application-workflow benchmark for the Taut checkpoints, plus the tasks where public
 Jev numbers exist so a like-for-like comparison is possible.
 
 Workflows (the demo Space's tabs), each on real labelled data:
   1 support triage      banking77 (77-way intent) + customer-support-tickets queue routing
   2 email + phishing    enron spam + phishing emails
-  3 LLM guardrails      lmsys/toxic-chat jailbreaking flag  (held out of Laya training)
+  3 LLM guardrails      lmsys/toxic-chat jailbreaking flag  (held out of Taut training)
   4 RAG passage filter  MS MARCO passage relevance
-  5 moderation          lmsys/toxic-chat toxicity flag      (held out of Laya training)
+  5 moderation          lmsys/toxic-chat toxicity flag      (held out of Taut training)
   6 model routing       domain classification over gsm8k / mbpp / writing / factual
 
 Jev-comparable tasks (AbdelStark/jev-benchmarks published Jev accuracy on these):
@@ -33,7 +33,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(REPO))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # bench_local lives here
 
-import laya  # noqa: E402
+import taut  # noqa: E402
 from bench_local import load, metrics, score_cases, softmax_t, temp_for  # noqa: E402
 
 OUT = os.path.join(REPO, "app_benchmark_results.json")
@@ -49,7 +49,7 @@ JEV_PUBLISHED = {
     "emotion": {"accuracy": 0.480, "brier": 0.846, "nll": 5.588, "coverage_at_5pct_error": 0.0,
                 "zero_prob_failures": 0.16, "n": 100, "source": "AbdelStark/jev-benchmarks v0.1.0"},
     "typed_decisions": {"accuracy": 0.727, "soft_accuracy": 0.580, "brier": 0.148, "ece": 0.144,
-                        "score_mae": 0.391, "ms_per_case": 710, "source": "laya repo comparison table"},
+                        "score_mae": 0.391, "ms_per_case": 710, "source": "taut repo comparison table"},
     "_independent_": {"banking77_accuracy": 0.763, "sms_spam_accuracy": 0.930,
                       "permuted_accuracy": 0.767, "ece": 0.246, "latency_p50_ms": "264-276",
                       "option_order_flip_rate": 0.13,
@@ -155,7 +155,7 @@ def build():
         d = load_dataset("SetFit/enron_spam", split="test")
         cases, gold = [], []
         for r in list(d)[:N]:
-            st = laya.email_state(r.get("subject") or "", (r.get("message") or "")[:3000])
+            st = taut.email_state(r.get("subject") or "", (r.get("message") or "")[:3000])
             cases.append((st, {"is_spam": {"type": "noul",
                                            "instructions": "Is this email unsolicited spam or bulk marketing?"}}))
             gold.append(int(r["label"]))
@@ -268,7 +268,7 @@ def main():
     print("=== building suites (N=%d per task) ===\n" % N, flush=True)
     build()
     results = {"meta": {"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "device": "cpu",
-                        "n_per_task": N, "seed": SEED, "laya": laya.__version__},
+                        "n_per_task": N, "seed": SEED, "taut": taut.__version__},
                "jev_published": JEV_PUBLISHED, "suites": {}}
     for mname in ("english", "multilingual", "typed-decisions"):
         print("\n=== %s ===" % mname, flush=True)

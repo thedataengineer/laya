@@ -22,8 +22,8 @@ from tokenizers import Tokenizer  # noqa: E402
 from tokenizers.models import WordLevel  # noqa: E402
 from transformers import BertConfig, BertModel, PreTrainedTokenizerFast  # noqa: E402
 
-from laya import load  # noqa: E402
-from laya.common import DecisionModel  # noqa: E402
+from taut import load  # noqa: E402
+from taut.common import DecisionModel  # noqa: E402
 
 
 class TemperatureLoadingTests(unittest.TestCase):
@@ -62,7 +62,7 @@ class TemperatureLoadingTests(unittest.TestCase):
         self.assertEqual(json.dumps(agent.cfg), json.dumps(cfg))
         self.assertEqual(json.dumps(agent.temperature_raw), json.dumps(cfg.get("temperature", [1.0] * 3)))
         self.assertEqual(json.dumps(agent.temperature_by_options_raw), json.dumps(cfg.get("temperature_by_options", {})))
-        messages = [w for w in caught if str(w.message).startswith("laya:")]
+        messages = [w for w in caught if str(w.message).startswith("taut:")]
         self.assertTrue(all(issubclass(w.category, RuntimeWarning) for w in messages))
         return agent, [str(w.message) for w in messages]
 

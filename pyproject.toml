@@ -3,16 +3,19 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "laya"
+name = "taut"
 version = "0.4.0"
-description = "Fast, non-autoregressive System 1 decision engine with calibrated probabilities"
+description = "Typed decisions in one forward pass, behind a risk bound you can certify"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Convai Innovations" }
+    { name = "Karteek Yadavilli", email = "aswanikarteek@gmail.com" }
 ]
-keywords = ["decision-model", "rlcd", "calibration", "system-one", "routing", "guardrails", "moderation", "triage"]
+maintainers = [
+    { name = "Karteek Yadavilli", email = "aswanikarteek@gmail.com" }
+]
+keywords = ["decision-model", "conformal-prediction", "risk-control", "calibration", "selective-prediction", "system-one", "routing", "guardrails", "moderation", "triage"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -34,32 +37,35 @@ dependencies = [
 
 [tool.setuptools]
 # assets/, research/ and notebooks/ sit in the root, so auto-discovery bails out.
-packages = ["laya", "laya.mcp", "laya.integrations"]
+packages = ["taut", "taut.mcp", "taut.integrations"]
 
 [project.optional-dependencies]
-# `pip install laya[serve]` adds the HTTP server (laya.serve / the laya-serve CLI).
+# `pip install taut[serve]` adds the HTTP server (taut.serve / the taut-serve CLI).
 serve = [
     "fastapi>=0.110.0",
     "uvicorn>=0.27.0",
 ]
-# `pip install laya[fast]` adds the TileLang GPU fast path (laya/fast.py); everything else works without it.
+# `pip install taut[fast]` adds the TileLang GPU fast path (taut/fast.py); everything else works without it.
 fast = ["tilelang>=0.1.14"]
 
-# `pip install laya[mcp]` adds the MCP stdio server (laya.mcp / the laya-mcp-server CLI).
+# `pip install taut[mcp]` adds the MCP stdio server (taut.mcp / the taut-mcp-server CLI).
 mcp = ["mcp>=2.2.0"]
 
 onnx = ["onnx", "onnxruntime"]
 
-# `pip install laya[langchain]` adds the LangChain / LangGraph integrations (laya.integrations).
+# `pip install taut[langchain]` adds the LangChain / LangGraph integrations (taut.integrations).
 langchain = [
     "langchain-core>=0.2.0",
 ]
 
 [project.scripts]
-laya = "laya.cli:main"
-laya-serve = "laya.serve:main"
-laya-mcp-server = "laya.mcp.server:main"
+taut = "taut.cli:main"
+taut-serve = "taut.serve:main"
+taut-mcp-server = "taut.mcp.server:main"
 
 [project.urls]
-Homepage = "https://huggingface.co/convaiinnovations/laya"
-Demo = "https://huggingface.co/spaces/convaiinnovations/laya-demo"
+Homepage = "https://github.com/thedataengineer/taut"
+Source = "https://github.com/thedataengineer/taut"
+Issues = "https://github.com/thedataengineer/taut/issues"
+Checkpoints = "https://huggingface.co/thekarteek/taut"
+Upstream = "https://github.com/NandhaKishorM/laya"

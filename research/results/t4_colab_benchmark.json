@@ -8,8 +8,8 @@
     "torch": "2.11.0+cu128",
     "transformers": "5.17.0",
     "models": {
-      "laya": {
-        "repo": "convaiinnovations/laya",
+      "taut": {
+        "repo": "thekarteek/taut",
         "params_total_m": 421.29,
         "params_encoder_m": 394.78,
         "params_head_m": 26.51,
@@ -41,8 +41,8 @@
         "download_s": 10.7,
         "tokenizer_config_patched": []
       },
-      "laya-multilingual": {
-        "repo": "convaiinnovations/laya-multilingual",
+      "taut-multilingual": {
+        "repo": "thekarteek/taut-multilingual",
         "params_total_m": 321.91,
         "params_encoder_m": 306.94,
         "params_head_m": 14.97,
@@ -73,7 +73,7 @@
   },
   "suites": {
     "typed_decisions": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 2000,
           "accuracy": 0.362,
@@ -146,7 +146,7 @@
           }
         }
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 2000,
           "accuracy": 0.3515,
@@ -221,7 +221,7 @@
       }
     },
     "massive_intent.en": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7833333333333333,
@@ -250,7 +250,7 @@
         "dropped_questions": 0,
         "questions_per_second": 87.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6566666666666666,
@@ -281,7 +281,7 @@
       }
     },
     "massive_intent.de": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.42,
@@ -310,7 +310,7 @@
         "dropped_questions": 0,
         "questions_per_second": 83.2
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4666666666666667,
@@ -341,7 +341,7 @@
       }
     },
     "massive_intent.fr": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4866666666666667,
@@ -370,7 +370,7 @@
         "dropped_questions": 0,
         "questions_per_second": 82.4
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5533333333333333,
@@ -401,7 +401,7 @@
       }
     },
     "massive_intent.es": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.48,
@@ -430,7 +430,7 @@
         "dropped_questions": 0,
         "questions_per_second": 83.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5033333333333333,
@@ -461,7 +461,7 @@
       }
     },
     "massive_intent.pt": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.45666666666666667,
@@ -490,7 +490,7 @@
         "dropped_questions": 0,
         "questions_per_second": 81.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.49333333333333335,
@@ -521,7 +521,7 @@
       }
     },
     "massive_intent.ru": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.29333333333333333,
@@ -550,7 +550,7 @@
         "dropped_questions": 0,
         "questions_per_second": 77.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5,
@@ -581,7 +581,7 @@
       }
     },
     "massive_intent.tr": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.16,
@@ -610,7 +610,7 @@
         "dropped_questions": 0,
         "questions_per_second": 77.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.43666666666666665,
@@ -641,7 +641,7 @@
       }
     },
     "massive_intent.ar": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.12666666666666668,
@@ -670,7 +670,7 @@
         "dropped_questions": 0,
         "questions_per_second": 75.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.38333333333333336,
@@ -701,7 +701,7 @@
       }
     },
     "massive_intent.hi": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.1,
@@ -730,7 +730,7 @@
         "dropped_questions": 0,
         "questions_per_second": 69.2
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.38666666666666666,
@@ -761,7 +761,7 @@
       }
     },
     "massive_intent.ta": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.11333333333333333,
@@ -790,7 +790,7 @@
         "dropped_questions": 0,
         "questions_per_second": 61.9
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.25,
@@ -821,7 +821,7 @@
       }
     },
     "massive_intent.zh-CN": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5933333333333334,
@@ -850,7 +850,7 @@
         "dropped_questions": 0,
         "questions_per_second": 74.7
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6066666666666667,
@@ -881,7 +881,7 @@
       }
     },
     "massive_intent.ja": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5466666666666666,
@@ -910,7 +910,7 @@
         "dropped_questions": 0,
         "questions_per_second": 73.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5866666666666667,
@@ -941,7 +941,7 @@
       }
     },
     "massive_intent.ko": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.10333333333333333,
@@ -970,7 +970,7 @@
         "dropped_questions": 0,
         "questions_per_second": 68.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.49,
@@ -1001,7 +1001,7 @@
       }
     },
     "massive_intent.sw": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.10333333333333333,
@@ -1030,7 +1030,7 @@
         "dropped_questions": 0,
         "questions_per_second": 71.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.21,
@@ -1061,7 +1061,7 @@
       }
     },
     "massive_scenario.en": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6033333333333334,
@@ -1090,7 +1090,7 @@
         "dropped_questions": 0,
         "questions_per_second": 132.6
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.56,
@@ -1121,7 +1121,7 @@
       }
     },
     "massive_scenario.de": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.2966666666666667,
@@ -1150,7 +1150,7 @@
         "dropped_questions": 0,
         "questions_per_second": 123.3
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4766666666666667,
@@ -1181,7 +1181,7 @@
       }
     },
     "massive_scenario.fr": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.46,
@@ -1210,7 +1210,7 @@
         "dropped_questions": 0,
         "questions_per_second": 121.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4533333333333333,
@@ -1241,7 +1241,7 @@
       }
     },
     "massive_scenario.es": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.38333333333333336,
@@ -1270,7 +1270,7 @@
         "dropped_questions": 0,
         "questions_per_second": 123.9
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.44666666666666666,
@@ -1301,7 +1301,7 @@
       }
     },
     "massive_scenario.pt": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.42,
@@ -1330,7 +1330,7 @@
         "dropped_questions": 0,
         "questions_per_second": 120.7
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4633333333333333,
@@ -1361,7 +1361,7 @@
       }
     },
     "massive_scenario.ru": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.34,
@@ -1390,7 +1390,7 @@
         "dropped_questions": 0,
         "questions_per_second": 114.6
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.47333333333333333,
@@ -1421,7 +1421,7 @@
       }
     },
     "massive_scenario.tr": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.22666666666666666,
@@ -1450,7 +1450,7 @@
         "dropped_questions": 0,
         "questions_per_second": 117.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.48333333333333334,
@@ -1481,7 +1481,7 @@
       }
     },
     "massive_scenario.ar": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.14,
@@ -1510,7 +1510,7 @@
         "dropped_questions": 0,
         "questions_per_second": 116.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.39666666666666667,
@@ -1541,7 +1541,7 @@
       }
     },
     "massive_scenario.hi": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.09666666666666666,
@@ -1570,7 +1570,7 @@
         "dropped_questions": 0,
         "questions_per_second": 100.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.44666666666666666,
@@ -1601,7 +1601,7 @@
       }
     },
     "massive_scenario.ta": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.10333333333333333,
@@ -1630,7 +1630,7 @@
         "dropped_questions": 0,
         "questions_per_second": 86.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.33666666666666667,
@@ -1661,7 +1661,7 @@
       }
     },
     "massive_scenario.zh-CN": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4866666666666667,
@@ -1690,7 +1690,7 @@
         "dropped_questions": 0,
         "questions_per_second": 123.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.49666666666666665,
@@ -1721,7 +1721,7 @@
       }
     },
     "massive_scenario.ja": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4666666666666667,
@@ -1750,7 +1750,7 @@
         "dropped_questions": 0,
         "questions_per_second": 120.7
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5066666666666667,
@@ -1781,7 +1781,7 @@
       }
     },
     "massive_scenario.ko": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.12666666666666668,
@@ -1810,7 +1810,7 @@
         "dropped_questions": 0,
         "questions_per_second": 114.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.42333333333333334,
@@ -1841,7 +1841,7 @@
       }
     },
     "massive_scenario.sw": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.1,
@@ -1870,7 +1870,7 @@
         "dropped_questions": 0,
         "questions_per_second": 126.8
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.3,
@@ -1901,7 +1901,7 @@
       }
     },
     "xnli.en": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.86,
@@ -1930,7 +1930,7 @@
         "dropped_questions": 0,
         "questions_per_second": 139.9
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.8433333333333334,
@@ -1961,7 +1961,7 @@
       }
     },
     "xnli.de": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.64,
@@ -1990,7 +1990,7 @@
         "dropped_questions": 0,
         "questions_per_second": 117.4
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7933333333333333,
@@ -2021,7 +2021,7 @@
       }
     },
     "xnli.fr": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.68,
@@ -2050,7 +2050,7 @@
         "dropped_questions": 0,
         "questions_per_second": 115.7
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7666666666666667,
@@ -2081,7 +2081,7 @@
       }
     },
     "xnli.es": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6833333333333333,
@@ -2110,7 +2110,7 @@
         "dropped_questions": 0,
         "questions_per_second": 123.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.8,
@@ -2141,7 +2141,7 @@
       }
     },
     "xnli.ru": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.61,
@@ -2170,7 +2170,7 @@
         "dropped_questions": 0,
         "questions_per_second": 96.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.74,
@@ -2201,7 +2201,7 @@
       }
     },
     "xnli.tr": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.38333333333333336,
@@ -2230,7 +2230,7 @@
         "dropped_questions": 0,
         "questions_per_second": 107.8
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.74,
@@ -2261,7 +2261,7 @@
       }
     },
     "xnli.ar": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.44,
@@ -2290,7 +2290,7 @@
         "dropped_questions": 0,
         "questions_per_second": 90.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7266666666666667,
@@ -2321,7 +2321,7 @@
       }
     },
     "xnli.hi": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4,
@@ -2350,7 +2350,7 @@
         "dropped_questions": 0,
         "questions_per_second": 68.6
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.66,
@@ -2381,7 +2381,7 @@
       }
     },
     "xnli.ur": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.37333333333333335,
@@ -2410,7 +2410,7 @@
         "dropped_questions": 0,
         "questions_per_second": 71.4
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6833333333333333,
@@ -2441,7 +2441,7 @@
       }
     },
     "xnli.vi": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.51,
@@ -2470,7 +2470,7 @@
         "dropped_questions": 0,
         "questions_per_second": 84.9
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7233333333333334,
@@ -2501,7 +2501,7 @@
       }
     },
     "xnli.th": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.4166666666666667,
@@ -2530,7 +2530,7 @@
         "dropped_questions": 0,
         "questions_per_second": 69.5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6966666666666667,
@@ -2561,7 +2561,7 @@
       }
     },
     "xnli.el": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5166666666666667,
@@ -2590,7 +2590,7 @@
         "dropped_questions": 0,
         "questions_per_second": 89.0
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7266666666666667,
@@ -2621,7 +2621,7 @@
       }
     },
     "xnli.bg": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.5433333333333333,
@@ -2650,7 +2650,7 @@
         "dropped_questions": 0,
         "questions_per_second": 93.9
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7933333333333333,
@@ -2681,7 +2681,7 @@
       }
     },
     "xnli.zh": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6733333333333333,
@@ -2710,7 +2710,7 @@
         "dropped_questions": 0,
         "questions_per_second": 110.4
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.7566666666666667,
@@ -2741,7 +2741,7 @@
       }
     },
     "xnli.sw": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.42333333333333334,
@@ -2770,7 +2770,7 @@
         "dropped_questions": 0,
         "questions_per_second": 109.1
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 300,
           "accuracy": 0.6266666666666667,
@@ -2801,7 +2801,7 @@
       }
     },
     "en.sst5": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.37166666666666665,
@@ -2832,7 +2832,7 @@
         "score_mae": 0.9045839813495934,
         "within_1": 0.6316666666666667
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.2816666666666667,
@@ -2865,7 +2865,7 @@
       }
     },
     "en.emotion": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.5733333333333334,
@@ -2894,7 +2894,7 @@
         "dropped_questions": 0,
         "questions_per_second": 243.9
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.5133333333333333,
@@ -2925,7 +2925,7 @@
       }
     },
     "en.prompt_injections": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 116,
           "accuracy": 0.6982758620689655,
@@ -2954,7 +2954,7 @@
         "dropped_questions": 0,
         "questions_per_second": 94.6
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 116,
           "accuracy": 0.5775862068965517,
@@ -2985,7 +2985,7 @@
       }
     },
     "en.ag_news": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.9466666666666667,
@@ -3014,7 +3014,7 @@
         "dropped_questions": 0,
         "questions_per_second": 128.8
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.9366666666666666,
@@ -3045,7 +3045,7 @@
       }
     },
     "en.boolq": {
-      "laya": {
+      "taut": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.83,
@@ -3074,7 +3074,7 @@
         "dropped_questions": 0,
         "questions_per_second": 71.8
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "calibrated": {
           "n": 600,
           "accuracy": 0.7866666666666666,
@@ -3106,7 +3106,7 @@
     }
   },
   "typed_decisions_matched_512": {
-    "laya": {
+    "taut": {
       "n": 2000,
       "accuracy": 0.362,
       "macro_f1": 0.3273577076400338,
@@ -3118,7 +3118,7 @@
       "acc_at_50_coverage": 0.427,
       "acc_at_80_coverage": 0.386875
     },
-    "laya-multilingual": {
+    "taut-multilingual": {
       "n": 2000,
       "accuracy": 0.3495,
       "macro_f1": 0.3481722969312257,
@@ -3132,7 +3132,7 @@
     }
   },
   "latency": {
-    "laya": {
+    "taut": {
       "1_questions": {
         "p50_ms": 39.5,
         "p95_ms": 44.8,
@@ -3154,7 +3154,7 @@
         "ms_per_question": 15.43
       }
     },
-    "laya-multilingual": {
+    "taut-multilingual": {
       "1_questions": {
         "p50_ms": 32.8,
         "p95_ms": 38.8,
@@ -3178,7 +3178,7 @@
     }
   },
   "option_order_robustness": {
-    "laya": {
+    "taut": {
       "massive_intent.en": {
         "n": 200,
         "flip_rate": 0.15
@@ -3192,7 +3192,7 @@
         "flip_rate": 0.0
       }
     },
-    "laya-multilingual": {
+    "taut-multilingual": {
       "massive_intent.en": {
         "n": 200,
         "flip_rate": 0.23
@@ -3208,7 +3208,7 @@
     }
   },
   "calibration_repair": {
-    "laya": {
+    "taut": {
       "per_suite": {
         "typed_decisions": {
           "n_heldout": 1000,
@@ -3755,7 +3755,7 @@
       "mean_ece_shipped": 0.4656,
       "mean_ece_refit": 0.0812
     },
-    "laya-multilingual": {
+    "taut-multilingual": {
       "per_suite": {
         "typed_decisions": {
           "n_heldout": 1000,
@@ -4304,13 +4304,13 @@
     }
   },
   "caveats": {
-    "context_window": "laya max_len=512, laya-multilingual max_len=1024 (shipped configs). See typed_decisions_matched_512 for the equal-budget control.",
-    "shipped_calibration": "laya ships fitted temperatures; laya-multilingual ships all-1.0 (uncalibrated). See calibration_repair for the out-of-sample refit.",
-    "training_overlap": "ag_news and boolq were in Laya's training mix (retention, not generalisation). sst5, emotion, prompt_injections, banking77 were held out. Neither checkpoint trained on typed-decisions, MASSIVE or XNLI."
+    "context_window": "taut max_len=512, taut-multilingual max_len=1024 (shipped configs). See typed_decisions_matched_512 for the equal-budget control.",
+    "shipped_calibration": "taut ships fitted temperatures; taut-multilingual ships all-1.0 (uncalibrated). See calibration_repair for the out-of-sample refit.",
+    "training_overlap": "ag_news and boolq were in Taut's training mix (retention, not generalisation). sst5, emotion, prompt_injections, banking77 were held out. Neither checkpoint trained on typed-decisions, MASSIVE or XNLI."
   },
   "summary": {
     "typed_decisions": {
-      "laya": {
+      "taut": {
         "n": 2000,
         "accuracy": 0.362,
         "macro_f1": 0.3273577076400338,
@@ -4322,7 +4322,7 @@
         "acc_at_50_coverage": 0.427,
         "acc_at_80_coverage": 0.386875
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "n": 2000,
         "accuracy": 0.3515,
         "macro_f1": 0.34975321170122525,
@@ -4336,13 +4336,13 @@
       }
     },
     "massive_intent": {
-      "laya": {
+      "taut": {
         "macro_accuracy": 0.3405,
         "macro_ece": 0.6266,
         "n_questions": 4200,
         "n_suites": 14
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "macro_accuracy": 0.466,
         "macro_ece": 0.3421,
         "n_questions": 4200,
@@ -4350,13 +4350,13 @@
       }
     },
     "massive_scenario": {
-      "laya": {
+      "taut": {
         "macro_accuracy": 0.3036,
         "macro_ece": 0.6707,
         "n_questions": 4200,
         "n_suites": 14
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "macro_accuracy": 0.4474,
         "macro_ece": 0.3857,
         "n_questions": 4200,
@@ -4364,13 +4364,13 @@
       }
     },
     "xnli": {
-      "laya": {
+      "taut": {
         "macro_accuracy": 0.5436,
         "macro_ece": 0.2296,
         "n_questions": 4500,
         "n_suites": 15
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "macro_accuracy": 0.7384,
         "macro_ece": 0.1813,
         "n_questions": 4500,
@@ -4378,13 +4378,13 @@
       }
     },
     "english": {
-      "laya": {
+      "taut": {
         "macro_accuracy": 0.684,
         "macro_ece": 0.1938,
         "n_questions": 2516,
         "n_suites": 5
       },
-      "laya-multilingual": {
+      "taut-multilingual": {
         "macro_accuracy": 0.6192,
         "macro_ece": 0.2842,
         "n_questions": 2516,
@@ -4393,32 +4393,32 @@
     },
     "massive_intent_english_vs_rest": {
       "english": {
-        "laya": 0.7833,
-        "laya-multilingual": 0.6567
+        "taut": 0.7833,
+        "taut-multilingual": 0.6567
       },
       "non_english": {
-        "laya": 0.3064,
-        "laya-multilingual": 0.4513
+        "taut": 0.3064,
+        "taut-multilingual": 0.4513
       }
     },
     "massive_scenario_english_vs_rest": {
       "english": {
-        "laya": 0.6033,
-        "laya-multilingual": 0.56
+        "taut": 0.6033,
+        "taut-multilingual": 0.56
       },
       "non_english": {
-        "laya": 0.2805,
-        "laya-multilingual": 0.4387
+        "taut": 0.2805,
+        "taut-multilingual": 0.4387
       }
     },
     "xnli_english_vs_rest": {
       "english": {
-        "laya": 0.86,
-        "laya-multilingual": 0.8433
+        "taut": 0.86,
+        "taut-multilingual": 0.8433
       },
       "non_english": {
-        "laya": 0.521,
-        "laya-multilingual": 0.731
+        "taut": 0.521,
+        "taut-multilingual": 0.731
       }
     }
   }

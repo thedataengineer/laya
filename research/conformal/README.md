@@ -1,6 +1,6 @@
 # Is the risk bound real?
 
-`laya.conformal` makes a falsifiable claim: fit a gate at `alpha`, and the risk it
+`taut.conformal` makes a falsifiable claim: fit a gate at `alpha`, and the risk it
 certifies is exceeded at most `delta` of the time — for any data distribution, at finite
 sample size, with no asymptotics. A claim like that is worth exactly as much as the
 evidence that it survives an attempt to break it.

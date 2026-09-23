@@ -1,13 +1,13 @@
 """MCP layer tests: schema, shape and registration. No model weights, no network.
 
-Requires the mcp extra:  pip install "laya[mcp]"
+Requires the mcp extra:  pip install "taut[mcp]"
 
 Run: python tests/test_mcp.py
 Skips cleanly (exit 0) when the mcp package is not installed, so the core
 install keeps working.
 
-Device and preload-list tests follow the laya.serve environment contract
-(LAYA_DEVICE / LAYA_PRELOAD / LAYA_MODELS / LAYA_THREADS).
+Device and preload-list tests follow the taut.serve environment contract
+(TAUT_DEVICE / TAUT_PRELOAD / TAUT_MODELS / TAUT_THREADS).
 """
 import asyncio
 import os
@@ -22,17 +22,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 try:
     import mcp  # noqa: F401
 except ImportError:
-    print("SKIP: mcp extra not installed (pip install 'laya[mcp]')")
+    print("SKIP: mcp extra not installed (pip install 'taut[mcp]')")
     sys.exit(0)
 
-from laya.mcp.device import agent_device, device_report, env_device, resolve_device, router_agent  # noqa: E402
-from laya.mcp.server import _models_from_env, server as mcp_server  # noqa: E402
-from laya.mcp.tools import (  # noqa: E402
+from taut.mcp.device import agent_device, device_report, env_device, resolve_device, router_agent  # noqa: E402
+from taut.mcp.server import _models_from_env, server as mcp_server  # noqa: E402
+from taut.mcp.tools import (  # noqa: E402
     ToolError,
-    laya_predict,
-    laya_preset,
-    laya_route,
-    laya_status,
+    taut_predict,
+    taut_preset,
+    taut_route,
+    taut_status,
     validate_model,
     validate_preset,
     validate_questions,
@@ -63,33 +63,33 @@ def expect_tool_error(name, fn, want_code):
 def test_device():
     ok("device/force_cpu", resolve_device("cpu") == "cpu")
     ok("device/force_cuda", resolve_device("cuda") == "cuda")
-    old = os.environ.get("LAYA_DEVICE")
+    old = os.environ.get("TAUT_DEVICE")
     try:
-        os.environ["LAYA_DEVICE"] = "cpu"
+        os.environ["TAUT_DEVICE"] = "cpu"
         ok("device/env_cpu", resolve_device() == "cpu")
-        os.environ["LAYA_DEVICE"] = "CUDA"
+        os.environ["TAUT_DEVICE"] = "CUDA"
         ok("device/env_case_insensitive", resolve_device() == "cuda")
-        os.environ["LAYA_DEVICE"] = "cpu"
+        os.environ["TAUT_DEVICE"] = "cpu"
         ok("device/force_beats_env", resolve_device("cuda") == "cuda")
     finally:
         if old is None:
-            os.environ.pop("LAYA_DEVICE", None)
+            os.environ.pop("TAUT_DEVICE", None)
         else:
-            os.environ["LAYA_DEVICE"] = old
+            os.environ["TAUT_DEVICE"] = old
     ok("device/fallback", resolve_device(None) in ("cuda", "cpu"))
-    # laya.serve contract: LAYA_DEVICE goes verbatim to torch; the label is lowercased.
-    old_dev = os.environ.get("LAYA_DEVICE")
+    # taut.serve contract: TAUT_DEVICE goes verbatim to torch; the label is lowercased.
+    old_dev = os.environ.get("TAUT_DEVICE")
     try:
-        os.environ["LAYA_DEVICE"] = "cuda:1"
+        os.environ["TAUT_DEVICE"] = "cuda:1"
         ok("device/env_raw_for_torch", env_device() == "cuda:1")
         ok("device/env_label", resolve_device() == "cuda:1")
-        os.environ["LAYA_DEVICE"] = "   "
+        os.environ["TAUT_DEVICE"] = "   "
         ok("device/env_blank_none", env_device() is None)
     finally:
         if old_dev is None:
-            os.environ.pop("LAYA_DEVICE", None)
+            os.environ.pop("TAUT_DEVICE", None)
         else:
-            os.environ["LAYA_DEVICE"] = old_dev
+            os.environ["TAUT_DEVICE"] = old_dev
     rep = device_report()
     ok("device/report_keys", set(rep) >= {"device", "torch_cuda", "torch_version"})
     ok("device/report_cuda_bool", isinstance(rep["torch_cuda"], bool))
@@ -164,7 +164,7 @@ class FakeRouter:
                 answers[name] = {"score": 1.84, "confidence": 0.8, "distribution": [0.1, 0.3, 0.6]}
             else:
                 answers[name] = {"noul": 0.892, "confidence": 0.89}
-        return {"answers": answers, "routing": {"model": "english", "repo": "fake/laya", "reason": "latin script"}}
+        return {"answers": answers, "routing": {"model": "english", "repo": "fake/taut", "reason": "latin script"}}
 
     def route(self, state, questions):
         class D:
@@ -175,7 +175,7 @@ class FakeRouter:
 
 
 def test_shape():
-    out = laya_predict(STATE, QUESTIONS, model="auto", router=FakeRouter())
+    out = taut_predict(STATE, QUESTIONS, model="auto", router=FakeRouter())
     ok("shape/predict_keys", set(out) >= {"answers", "routing", "latency_ms"})
     ok("shape/predict_choice", out["answers"]["department"]["choice"] == "billing")
     ok("shape/predict_noul_float", isinstance(out["answers"]["churn_risk"]["noul"], float))
@@ -189,10 +189,10 @@ def test_shape():
         def predict(self, state, questions, **kwargs):
             return {"answers": {}, "routing": {"model": "english"}}
 
-    out = laya_predict(STATE, QUESTIONS, model="auto", router=RouterNoAgents())
+    out = taut_predict(STATE, QUESTIONS, model="auto", router=RouterNoAgents())
     ok("shape/predict_device_absent_when_unreadable", "device" not in out, repr(set(out)))
 
-    out = laya_route(STATE, QUESTIONS, router=FakeRouter())
+    out = taut_route(STATE, QUESTIONS, router=FakeRouter())
     ok("shape/route_dict", out == {"model": "multilingual", "repo": "fake/repo",
                                    "reason": "non-Latin script (devanagari)"})
 
@@ -200,28 +200,28 @@ def test_shape():
         assert attr == "triage_questions"
         return {"intent": {"type": "choice", "instructions": "i", "criteria": {"a": "A"}}}
 
-    out = laya_preset("triage", {"message": "help"}, router=FakeRouter(), preset_builder=builder)
+    out = taut_preset("triage", {"message": "help"}, router=FakeRouter(), preset_builder=builder)
     ok("shape/preset_answers", "intent" in out["answers"])
 
-    out = laya_status(router=FakeRouter(), loaded=["english"], preload=True)
+    out = taut_status(router=FakeRouter(), loaded=["english"], preload=True)
     ok("shape/status_ready", out["router_ready"] is True)
     ok("shape/status_loaded", out["loaded"] == ["english"])
-    ok("shape/status_versions", "laya" in out["package_versions"])
+    ok("shape/status_versions", "taut" in out["package_versions"])
     ok("shape/status_device", out["device"] == "cpu", repr(out.get("device")))
     ok("shape/status_device_is_fact", out["device_is_preference"] is False)
     ok("shape/status_checkpoint_devices", out["checkpoint_devices"] == {"english": "cpu"},
        repr(out.get("checkpoint_devices")))
-    out = laya_status(router=None, loaded=None, preload=True)
+    out = taut_status(router=None, loaded=None, preload=True)
     ok("shape/status_pref_before_load",
        out["device_is_preference"] is True and out["checkpoint_devices"] == {}
        and out["device"] in ("cpu", "cuda", "mps"),
        repr(out.get("device")))
 
     expect_tool_error("shape/predict_missing_router",
-                      lambda: laya_predict(STATE, QUESTIONS, model="auto", router=None),
+                      lambda: taut_predict(STATE, QUESTIONS, model="auto", router=None),
                       "models_not_ready")
     expect_tool_error("shape/predict_bad_questions",
-                      lambda: laya_predict(STATE, {}, model="auto", router=FakeRouter()),
+                      lambda: taut_predict(STATE, {}, model="auto", router=FakeRouter()),
                       "invalid_questions")
 
 
@@ -257,27 +257,27 @@ def test_real_device():
         def predict(self, state, questions, **kwargs):
             return {"answers": {}, "routing": {"model": "english"}}
 
-    out = laya_predict(STATE, QUESTIONS, model="auto", router=RouterLoadIsASideEffect())
+    out = taut_predict(STATE, QUESTIONS, model="auto", router=RouterLoadIsASideEffect())
     ok("device/load_never_called", out.get("device") == "cpu", repr(out.get("device")))
 
 
 # --- contract on the private Router._agents name (no weights, no network) ----
 
 def test_private_contract():
-    # Why this test exists: laya.mcp.device.router_agent reads the private
+    # Why this test exists: taut.mcp.device.router_agent reads the private
     # Router._agents mapping, because it is the only side-effect-free way to
     # read a loaded agent's real device. If the core ever renames _agents,
-    # the device would silently disappear from the laya_status/laya_predict
+    # the device would silently disappear from the taut_status/taut_predict
     # answers: every other test in this file uses fakes that carry their own
     # _agents attribute, so only a test built on a real Router would notice.
     # A rename must break CI loudly instead of degrading the answers silently.
-    import laya
+    import taut
 
     # A real Router with preload=False (the default) loads nothing on
     # construction: no checkpoint build, no download (downloads only happen
     # inside load()/preload()). If that ever changed, this line would fail
     # here rather than on the network.
-    r = laya.Router()
+    r = taut.Router()
     ok("contract/no_download_on_construct", list(r.loaded) == [], repr(list(r.loaded)))
 
     class MpsDevice:  # torch.device-like: a .type attribute
@@ -288,7 +288,7 @@ def test_private_contract():
     ok("contract/attach_resident", list(r.loaded) == ["english"], repr(list(r.loaded)))
     ok("contract/router_agents_readable", router_agent(r, "english") is fake)
     ok("contract/agent_device_mps", agent_device(router_agent(r, "english")) == "mps")
-    out = laya_status(router=r, preload=False)
+    out = taut_status(router=r, preload=False)
     ok("contract/status_mps",
        out.get("checkpoint_devices") == {"english": "mps"}
        and out.get("device") == "mps" and out.get("device_is_preference") is False,
@@ -303,9 +303,9 @@ def test_timeout_removed():
     # functions no longer accept a timeout argument.
     import inspect
 
-    import laya.mcp.tools as tools_mod
+    import taut.mcp.tools as tools_mod
 
-    for fn in (laya_predict, laya_route, laya_preset):
+    for fn in (taut_predict, taut_route, taut_preset):
         ok("timeout/param_absent_%s" % fn.__name__, "timeout" not in inspect.signature(fn).parameters)
     ok("timeout/executor_absent", "ThreadPoolExecutor" not in inspect.getsource(tools_mod))
 
@@ -313,35 +313,35 @@ def test_timeout_removed():
 # --- server registration (schema only, no model load) ------------------------
 
 def test_models_from_env():
-    old = os.environ.get("LAYA_MODELS")
+    old = os.environ.get("TAUT_MODELS")
     try:
-        os.environ.pop("LAYA_MODELS", None)
+        os.environ.pop("TAUT_MODELS", None)
         ok("models/mcp_default", _models_from_env() == ["english", "multilingual"])
-        os.environ["LAYA_MODELS"] = ""
+        os.environ["TAUT_MODELS"] = ""
         ok("models/empty_default", _models_from_env() == ["english", "multilingual"])
-        os.environ["LAYA_MODELS"] = " english , multilingual "
+        os.environ["TAUT_MODELS"] = " english , multilingual "
         ok("models/whitespace", _models_from_env() == ["english", "multilingual"])
-        os.environ["LAYA_MODELS"] = "typed-decisions"
+        os.environ["TAUT_MODELS"] = "typed-decisions"
         ok("models/explicit_single", _models_from_env() == ["typed-decisions"])
-        os.environ["LAYA_MODELS"] = "english, multilingual, typed-decisions,"
+        os.environ["TAUT_MODELS"] = "english, multilingual, typed-decisions,"
         ok("models/trailing_comma", _models_from_env() == ["english", "multilingual", "typed-decisions"])
     finally:
         if old is None:
-            os.environ.pop("LAYA_MODELS", None)
+            os.environ.pop("TAUT_MODELS", None)
         else:
-            os.environ["LAYA_MODELS"] = old
+            os.environ["TAUT_MODELS"] = old
 
 
 def test_server_registration():
     tools = asyncio.run(mcp_server.list_tools())
     names = sorted(t.name for t in tools)
-    ok("server/tool_names", names == ["laya_predict", "laya_preset", "laya_route", "laya_status"], repr(names))
-    decision = {"laya_predict", "laya_route", "laya_preset"}
+    ok("server/tool_names", names == ["taut_predict", "taut_preset", "taut_route", "taut_status"], repr(names))
+    decision = {"taut_predict", "taut_route", "taut_preset"}
     for t in tools:
         desc = (t.description or "").lower()
         ok("server/desc_%s_nonempty" % t.name, bool(desc.strip()), repr(desc))
         # The guardrails constant is on the three decision tools only;
-        # laya_status reports instead of deciding.
+        # taut_status reports instead of deciding.
         if t.name in decision:
             ok("server/desc_%s_guardrail" % t.name, "do not use" in desc)
 

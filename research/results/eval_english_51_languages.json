@@ -1,13 +1,13 @@
 {
- "cases_note": "per-case records omitted from this file to keep the diff reviewable; regenerate with research/eval/laya_eval.py --langs all --out <path>",
+ "cases_note": "per-case records omitted from this file to keep the diff reviewable; regenerate with research/eval/taut_eval.py --langs all --out <path>",
  "config": {
   "dataset": "mteb/amazon_massive_intent",
   "device": "cpu",
   "head_max_len": 192,
   "instructions": "What is the user asking for in `utterance`?",
-  "laya_version": "0.3.6",
+  "taut_version": "0.3.6",
   "max_len": 512,
-  "model": "convaiinnovations/laya",
+  "model": "thekarteek/taut",
   "n_opts": 20,
   "per_lang": 100,
   "seed": 13,

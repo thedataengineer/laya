@@ -6,7 +6,7 @@ from contextlib import redirect_stderr, redirect_stdout
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from laya import cli  # noqa: E402
+from taut import cli  # noqa: E402
 
 PASS, FAIL = [], []
 
@@ -20,7 +20,7 @@ def check(name, condition, detail=""):
 
 class StubDecision(dict):
     def __init__(self):
-        super().__init__(model="multilingual", repo="convaiinnovations/laya",
+        super().__init__(model="multilingual", repo="thekarteek/taut",
                          reason="detected non-English text", detection={"lang": "de"}, workflow=None)
 
 
@@ -77,7 +77,7 @@ class BrokenRouter:
 
 code, out, err, stub = run_cli(["some text"], router=BrokenRouter())
 check("error: exit code 2", code == 2, "got %r" % code)
-check("error: names the failure", "could not run Laya" in err, err)
+check("error: names the failure", "could not run Taut" in err, err)
 check("error: points at the fix", "Hugging Face hub" in err, err)
 
 # --------------------------------------------------------------------- explicit flags
@@ -92,7 +92,7 @@ import tempfile  # noqa: E402
 
 import numpy as np  # noqa: E402
 
-from laya.conformal import ConformalGate  # noqa: E402
+from taut.conformal import ConformalGate  # noqa: E402
 
 
 class GatedStubRouter(StubRouter):

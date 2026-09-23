@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from laya.shortlist import _cosine
+from taut.shortlist import _cosine
 
 class ShortlistCosineTests(unittest.TestCase):
     def test_cosine_identical_vectors(self):

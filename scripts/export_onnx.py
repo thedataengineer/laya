@@ -2,7 +2,7 @@ import argparse
 import os
 import torch
 
-from laya.agent import Agent
+from taut.agent import Agent
 
 def export_to_onnx(model_id_or_path: str, output_path: str):
     print(f"Loading PyTorch Agent from: {model_id_or_path}")
@@ -75,9 +75,9 @@ def export_to_onnx(model_id_or_path: str, output_path: str):
     print(f"Successfully exported ONNX model to: {output_path}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Export a Laya model to ONNX format")
-    parser.add_argument("--model", type=str, default="convaiinnovations/laya", help="HuggingFace Hub ID or local path")
-    parser.add_argument("--output", type=str, default="laya.onnx", help="Output path for the ONNX file")
+    parser = argparse.ArgumentParser(description="Export a Taut model to ONNX format")
+    parser.add_argument("--model", type=str, default="thekarteek/taut", help="HuggingFace Hub ID or local path")
+    parser.add_argument("--output", type=str, default="taut.onnx", help="Output path for the ONNX file")
     args = parser.parse_args()
     
     export_to_onnx(args.model, args.output)

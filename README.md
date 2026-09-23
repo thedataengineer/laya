@@ -1,42 +1,47 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/NandhaKishorM/laya/main/assets/logo-lockup-dark.png" />
-    <img src="https://raw.githubusercontent.com/NandhaKishorM/laya/main/assets/logo-lockup.png" alt="Laya" width="330" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/thedataengineer/taut/main/assets/logo-lockup-dark.png" />
+    <img src="https://raw.githubusercontent.com/thedataengineer/taut/main/assets/logo-lockup.png" alt="Taut" width="330" />
   </picture>
 </p>
 
-**Multilingual, non-autoregressive System 1 decision engine.** Typed decisions over 100+ languages in a single forward pass — 33 ms — trained with reinforcement learning against strictly proper scoring rules (RLCD), with a router that picks the right checkpoint per request.
+**Typed decisions in one forward pass, behind a risk bound you can certify.** Taut answers
+typed questions over 100+ languages in 33 ms with no text generation — and then puts a
+*contract* on the answer: a threshold fitted to your risk budget, carrying a
+distribution-free, finite-sample guarantee, plus a monitor that tells you when that
+guarantee has expired.
 
 <div align="center">
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/15d4Yv__KHeHjshVb-6PRTfqVllxih2S3?usp=sharing)
-[![PyPI version](https://img.shields.io/pypi/v/laya.svg)](https://pypi.org/project/laya/)
-[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-convaiinnovations%2Flaya-blue)](https://huggingface.co/convaiinnovations/laya)
-[![Multilingual](https://img.shields.io/badge/%F0%9F%A4%97%20Model-laya--multilingual-blue)](https://huggingface.co/convaiinnovations/laya-multilingual)
-[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Space-laya--demo-orange)](https://huggingface.co/spaces/convaiinnovations/laya-demo)
-[![Dev.to Article](https://img.shields.io/badge/dev.to-Read%20Article-0A0A0A?logo=devdotto&logoColor=white)](https://dev.to/nandakishor_m_6cc0adfde9f/i-built-non-autoregressive-decision-models-a-year-ago-then-a-frontier-lab-called-it-a-18me)
-[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-nandakishorm-FFDD00?logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/nandakishorm)
+[![PyPI version](https://img.shields.io/pypi/v/taut.svg)](https://pypi.org/project/taut/)
+[![Hugging Face Model](https://img.shields.io/badge/%F0%9F%A4%97%20Model-thekarteek%2Ftaut-blue)](https://huggingface.co/thekarteek/taut)
+[![Multilingual](https://img.shields.io/badge/%F0%9F%A4%97%20Model-taut--multilingual-blue)](https://huggingface.co/thekarteek/taut-multilingual)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
 
 </div>
 
+> **Taut is a fork of [Laya](https://github.com/NandhaKishorM/laya)** by Convai Innovations,
+> Apache-2.0. The encoder, the RLCD training recipe and the router are theirs. What Taut adds
+> is the layer above the score: [certified risk control](#certified-risk-control), drift
+> monitoring, and the operational surface around them. See [Attribution](#attribution).
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/NandhaKishorM/laya/main/assets/laya_vs_jev_full.png" alt="Laya versus TypeSafe Jev: accuracy on shared public datasets, every application workflow, all 51 languages, speed, calibration, and the cost of not preloading" width="100%" />
+  <img src="https://raw.githubusercontent.com/thedataengineer/taut/main/assets/taut_vs_jev_full.png" alt="Taut versus TypeSafe Jev: accuracy on shared public datasets, every application workflow, all 51 languages, speed, calibration, and the cost of not preloading" width="100%" />
 </p>
 
-Laya evaluates typed questions (`choice`, `score`, `noul`) over any state (text, email, ticket or JSON document) in **a single forward pass** — 33 ms for one question, 7.2 ms/question batched, measured on a T4. No text generation, so nothing to parse and nothing to hallucinate.
+Taut evaluates typed questions (`choice`, `score`, `noul`) over any state (text, email, ticket or JSON document) in **a single forward pass** — 33 ms for one question, 7.2 ms/question batched, measured on a T4. No text generation, so nothing to parse and nothing to hallucinate.
 
 Three checkpoints, and a `Router` that picks between them per request:
 
 | | encoder | params | context | use it for |
 |---|---|---|---|---|
-| [`laya`](https://huggingface.co/convaiinnovations/laya) | ModernBERT-large | 421M | 512 | English |
-| [`laya-multilingual`](https://huggingface.co/convaiinnovations/laya-multilingual) | mmBERT-base | 322M | 1024 | 100+ languages, 2x faster |
-| [`laya-typed-decisions`](https://huggingface.co/convaiinnovations/laya-typed-decisions) | ModernBERT-large | 421M | 1024 | the typed-decisions workflows |
+| [`taut`](https://huggingface.co/thekarteek/taut) | ModernBERT-large | 421M | 512 | English |
+| [`taut-multilingual`](https://huggingface.co/thekarteek/taut-multilingual) | mmBERT-base | 322M | 1024 | 100+ languages, 2x faster |
+| [`taut-typed-decisions`](https://huggingface.co/thekarteek/taut-typed-decisions) | ModernBERT-large | 421M | 1024 | the typed-decisions workflows |
 
 ### What's new in 0.4.0
 
-* **Certified risk control.** `laya.conformal` turns a calibrated probability into an operating contract: a threshold, prediction set or interval carrying a distribution-free, finite-sample guarantee. Four modes — `selective`, `miss`, `set`, `interval` — fitted from a labelled split, serialised to JSON, applied without torch. It reports when your calibration set is too small to certify anything rather than returning a threshold it cannot stand behind. See [Certified Risk Control](#certified-risk-control).
+* **Certified risk control.** `taut.conformal` turns a calibrated probability into an operating contract: a threshold, prediction set or interval carrying a distribution-free, finite-sample guarantee. Four modes — `selective`, `miss`, `set`, `interval` — fitted from a labelled split, serialised to JSON, applied without torch. It reports when your calibration set is too small to certify anything rather than returning a threshold it cannot stand behind. See [Certified Risk Control](#certified-risk-control).
 
 ### What's new in 0.3.9
 
@@ -45,9 +50,9 @@ Three checkpoints, and a `Router` that picks between them per request:
 ### What's new in 0.3.8
 
 * **Batch scoring.** `agent.predict_batch(states, questions)` scores many states in shared forward passes, with answers identical to calling `predict` one state at a time. See [Batch Mode](#batch-mode-score-many-states-in-one-forward-pass).
-* **Faster paths, all opt-in.** `laya.load(..., fast=True)` uses a TileLang GPU fast path that matches the stock bf16 forward within rounding (see [GPU Fast Path](#gpu-fast-path-tilelang)). `Agent(compile=True)` enables `torch.compile`, and `laya.onnx_agent.ONNXAgent` runs an exported model on ONNX Runtime. A second `Agent` for the same checkpoint reuses its parsed tokenizer, so it loads in about 0.5 s instead of about 3 s.
-* **`import laya` no longer loads torch.** Routing, language detection and e-mail cleaning work in lightweight processes; torch loads on first use of a model.
-* **New ways to call Laya.** A `laya` [command](#command-line) for quick local tests, an optional [MCP server](#mcp-server-optional) (`pip install "laya[mcp]"`), [LangChain and LangGraph](#langchain-and-langgraph-integration) routing, guardrails, triage and evaluation (`pip install "laya[langchain]"`), and `laya-ts/`, a TypeScript package for Node and the browser that gives the same answers as the Python package.
+* **Faster paths, all opt-in.** `taut.load(..., fast=True)` uses a TileLang GPU fast path that matches the stock bf16 forward within rounding (see [GPU Fast Path](#gpu-fast-path-tilelang)). `Agent(compile=True)` enables `torch.compile`, and `taut.onnx_agent.ONNXAgent` runs an exported model on ONNX Runtime. A second `Agent` for the same checkpoint reuses its parsed tokenizer, so it loads in about 0.5 s instead of about 3 s.
+* **`import taut` no longer loads torch.** Routing, language detection and e-mail cleaning work in lightweight processes; torch loads on first use of a model.
+* **New ways to call Taut.** A `taut` [command](#command-line) for quick local tests, an optional [MCP server](#mcp-server-optional) (`pip install "taut[mcp]"`), [LangChain and LangGraph](#langchain-and-langgraph-integration) routing, guardrails, triage and evaluation (`pip install "taut[langchain]"`), and `taut-ts/`, a TypeScript package for Node and the browser that gives the same answers as the Python package.
 * **HTTP server fixes.** Inference runs off the event loop, so one request no longer stalls `/health` and other clients. The published Hugging Face ids select their checkpoint, and Docker Compose gains an HTTP service.
 * **Routing.** CJK text containing Latin brand names, romanized Bangla, and Azerbaijani now reach the multilingual checkpoint. Checked on 20,000 English texts: at most 5 English sentences move, all quoting long native-script names.
 * **Correctness fixes.** Long conversation lists keep the newest turn when truncated. Non-ASCII instructions reach the model as text instead of `\uXXXX` escapes. `truncate_left` with no room left keeps none of the state rather than all of it. `Router.preload([])` loads nothing. `noul` questions accept an opt-in `labels` override. Intel XPU devices are detected.
@@ -56,9 +61,9 @@ Three checkpoints, and a `Router` that picks between them per request:
 
 ### What's new in 0.3.7
 
-* **About 10x faster loading.** Checkpoints are built without the throwaway random weight initialisation, so `laya.load()` drops from about 22 s to about 2 s on CPU with bit-identical answers. This also skips the pass that crashed on Windows with Python 3.14 (#123).
+* **About 10x faster loading.** Checkpoints are built without the throwaway random weight initialisation, so `taut.load()` drops from about 22 s to about 2 s on CPU with bit-identical answers. This also skips the pass that crashed on Windows with Python 3.14 (#123).
 * **Better routing for non-English Latin text.** Plain-ASCII Spanish, Italian, Portuguese and French (accents stripped by mail clients and ticket systems) and Brazilian Portuguese support text now reach the multilingual checkpoint. Letters in scripts the router has no range for no longer fall through to English, and URLs, e-mail addresses and dotted names no longer count as words. Checked on 20,000 English texts, with no English prose moved.
-* **A Jev-compatible HTTP server.** `pip install "laya[serve]"`, then `laya-serve`, speaks `POST /v1/systemone`, so existing TypeSafe clients work by changing `baseUrl`. See [Self-Hosting](#self-hosting-http-server-jev-compatible).
+* **A Jev-compatible HTTP server.** `pip install "taut[serve]"`, then `taut-serve`, speaks `POST /v1/systemone`, so existing TypeSafe clients work by changing `baseUrl`. See [Self-Hosting](#self-hosting-http-server-jev-compatible).
 * **Router defaults and hooks.** `Router()` keeps two checkpoints resident, so alternating languages no longer reload a model on every request. You can pass your own language guess with `lang_guess=` and send undecided text to `Router(default=...)`. `Router` and `Agent` also work as context managers, and evicted models free their memory.
 * **Clearer errors and safer edge cases.** A malformed question is rejected with a message naming the question and what to fix. An empty question set returns an empty answer, and invalid temperatures in a checkpoint no longer stop it loading.
 * **E-mail cleaning for Portuguese and Spanish** replies, signatures and footers.
@@ -71,12 +76,12 @@ Three checkpoints, and a `Router` that picks between them per request:
 
 Python 3.10 or newer. The dependencies set that floor: `huggingface_hub` 1.x, `transformers` 5.x and `torch` 2.14 all require 3.10.
 
-**Optional PyTorch build selection:** If you need a CPU-only or GPU-specific PyTorch build, follow [PyTorch's installation guide](https://pytorch.org/get-started/locally/) after creating your virtual environment and before installing Laya. Replace `pip` or `pip3` in the selected command with the environment's Python executable followed by `-m pip`.
+**Optional PyTorch build selection:** If you need a CPU-only or GPU-specific PyTorch build, follow [PyTorch's installation guide](https://pytorch.org/get-started/locally/) after creating your virtual environment and before installing Taut. Replace `pip` or `pip3` in the selected command with the environment's Python executable followed by `-m pip`.
 
 If you already use a virtual environment, install the PyPI release with:
 
 ```bash
-python -m pip install laya
+python -m pip install taut
 ```
 
 For a new environment, choose the commands for your platform below. Run them from your project directory; the explicit Python paths keep installation and verification in the same environment.
@@ -87,19 +92,19 @@ On Debian/Ubuntu, the system Python may require `sudo apt install python3-venv` 
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install laya
-.venv/bin/python -I -c "import laya; print(laya.__version__)"
+.venv/bin/python -m pip install taut
+.venv/bin/python -I -c "import taut; print(taut.__version__)"
 ```
 
 **Windows PowerShell** (this example uses an installed Python 3.11):
 
 ```powershell
 py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install laya
-.\.venv\Scripts\python.exe -I -c "import laya; print(laya.__version__)"
+.\.venv\Scripts\python.exe -m pip install taut
+.\.venv\Scripts\python.exe -I -c "import taut; print(taut.__version__)"
 ```
 
-Both checks print the installed Laya version without loading a checkpoint. `-I` excludes the current directory from the import search path, so a local source copy cannot mask a missing installation. Keep using the same virtual environment's Python when running your application.
+Both checks print the installed Taut version without loading a checkpoint. `-I` excludes the current directory from the import search path, so a local source copy cannot mask a missing installation. Keep using the same virtual environment's Python when running your application.
 
 **Install from GitHub**
 
@@ -107,12 +112,12 @@ To use the development version instead of the PyPI release, create the virtual e
 
 ```bash
 # macOS / Linux
-.venv/bin/python -m pip install "git+https://github.com/NandhaKishorM/laya.git"
+.venv/bin/python -m pip install "git+https://github.com/thedataengineer/taut.git"
 ```
 
 ```powershell
 # Windows PowerShell
-.\.venv\Scripts\python.exe -m pip install "git+https://github.com/NandhaKishorM/laya.git"
+.\.venv\Scripts\python.exe -m pip install "git+https://github.com/thedataengineer/taut.git"
 ```
 
 Run the same version check afterward. The GitHub version follows the repository's default branch and may differ from the published release.
@@ -121,23 +126,46 @@ Run the same version check afterward. The GitHub version follows the repository'
 
 Continue with the [Router quickstart](#quickstart-route-mode-recommended) to run inference. Loading a Hub checkpoint requires access to Hugging Face on its first download; the quickstart's `Router(preload=True)` loads all three configured checkpoints at construction.
 
-- **`ModuleNotFoundError: No module named 'laya'`:** run both installation and your script with the same virtual environment's Python executable shown above. In an editor, select that interpreter as well.
-- **Missing `rl_agent_config.json`:** this file ships with a Laya checkpoint alongside `model.safetensors`; it is not a configuration file you need to create in the source repository. For a local model, pass the directory containing those checkpoint files.
+- **`ModuleNotFoundError: No module named 'taut'`:** run both installation and your script with the same virtual environment's Python executable shown above. In an editor, select that interpreter as well.
+- **Missing `rl_agent_config.json`:** this file ships with a Taut checkpoint alongside `model.safetensors`; it is not a configuration file you need to create in the source repository. For a local model, pass the directory containing those checkpoint files.
 
 ---
 
 ### Command line
 
-Installing the package also installs a `laya` command for quick local testing, no script needed:
+Installing the package also installs a `taut` command for quick local testing, no script needed:
 
 ```bash
-laya "I was charged twice, please refund"            # routing decision only; works offline, no download
-laya "Refactor this service" --predict               # full answers (downloads the checkpoint on first use)
-laya "Mein Konto wurde zweimal belastet" --lang de   # force a language instead of detecting it
-laya                                                 # interactive mode
+taut "I was charged twice, please refund"            # routing decision only; works offline, no download
+taut "Refactor this service" --predict               # full answers (downloads the checkpoint on first use)
+taut "Mein Konto wurde zweimal belastet" --lang de   # force a language instead of detecting it
+taut                                                 # interactive mode
 ```
 
 Routing alone never downloads a checkpoint, so it returns in milliseconds. `--predict` loads the routed checkpoint, which needs network access to the Hugging Face hub the first time; if a checkpoint cannot be downloaded, the CLI says so instead of crashing.
+
+---
+
+### First run: publish the checkpoint mirrors
+
+Taut loads its weights from `thekarteek/taut*` on Hugging Face — mirrors of upstream's
+Apache-2.0 Laya checkpoints, republished unmodified so this package does not depend on
+another account's repo names staying put. If you are running from a fresh clone of this
+fork and those mirrors do not exist yet, publish them once:
+
+```bash
+huggingface-cli login
+python scripts/mirror_checkpoints.py --dry-run    # show the plan
+python scripts/mirror_checkpoints.py              # ask, then publish
+```
+
+Or skip mirroring entirely and load upstream's originals:
+
+```bash
+export TAUT_MODEL_ORG=convaiinnovations
+```
+
+Nothing is retrained or altered either way; they are the same weights.
 
 ---
 
@@ -147,10 +175,10 @@ To try the Python SDK in a CPU container, see the
 [Docker Compose quickstart](docs/docker.md). It runs a sample request and keeps
 downloaded models between runs.
 
-Laya ships three checkpoints. The built-in **`Router`** is the recommended entry point: it evaluates any state in any language, automatically detects scripts and languages in sub-milliseconds, and dispatches to the optimal checkpoint in a single forward pass.
+Taut ships three checkpoints. The built-in **`Router`** is the recommended entry point: it evaluates any state in any language, automatically detects scripts and languages in sub-milliseconds, and dispatches to the optimal checkpoint in a single forward pass.
 
 ```python
-from laya import Router
+from taut import Router
 
 # Preload checkpoints into memory for instant sub-35ms routing
 router = Router(preload=True)
@@ -189,12 +217,12 @@ questions = {
     }
 }
 
-# 3. English state -> automatically routed to laya (ModernBERT-large, 39.5 ms)
+# 3. English state -> automatically routed to taut (ModernBERT-large, 39.5 ms)
 res_en = router.predict(state, questions)
 print("Department :", res_en["answers"]["department"]["choice"])  # -> billing (confidence: 0.94)
 print("Routing    :", res_en["routing"]["model"])                 # -> english
 
-# 4. Hindi state -> automatically routed to laya-multilingual (mmBERT-base, 32.8 ms)
+# 4. Hindi state -> automatically routed to taut-multilingual (mmBERT-base, 32.8 ms)
 res_hi = router.predict({"body": "मुझसे दो बार शुल्क लिया गया, कृपया पैसे वापस करें।"}, questions)
 print("Department :", res_hi["answers"]["department"]["choice"])  # -> billing (confidence: 0.86)
 print("Routing    :", res_hi["routing"]["model"])                 # -> multilingual
@@ -209,7 +237,7 @@ Every result carries full routing metadata explaining why the choice was made:
 res_hi["routing"]
 # {
 #   'model': 'multilingual',
-#   'repo': 'convaiinnovations/laya/multilingual',
+#   'repo': 'thekarteek/taut/multilingual',
 #   'reason': 'non-Latin script (devanagari, 100% of letters); the English checkpoint cannot read it'
 # }
 ```
@@ -233,7 +261,7 @@ router.route({"body": "Please refund the duplicate charge"}).model  # -> english
 
 On a shared benchmark (17,416 questions, one T4 GPU, identical questions per model):
 
-| Benchmark / Task | English (`laya`) | Multilingual (`laya-multilingual`) | `Router` (Routed) |
+| Benchmark / Task | English (`taut`) | Multilingual (`taut-multilingual`) | `Router` (Routed) |
 |---|---|---|---|
 | MASSIVE intent, English | **0.783** | 0.657 | **0.783** |
 | MASSIVE intent, 13 other languages | 0.306 | **0.451** | **0.451** |
@@ -285,7 +313,7 @@ cheaper.
 Routing asks one question: *can the English checkpoint read this state?* The built-in detector answers it from the script and a function-word heuristic, and is deliberately dependency-free. That heuristic is best-effort on Latin-script languages it holds no word list for, so a short request can carry no usable signal:
 
 ```python
-from laya.lang import analyse
+from taut.lang import analyse
 analyse("Care este ora in Tokyo?")
 # {'script': 'latin', 'language': 'en', 'is_english': True}   -> the English checkpoint
 ```
@@ -309,16 +337,16 @@ The hint only decides *English or not*: a code whose primary subtag is `en`, `en
 
 ## Self-Hosting: HTTP Server (Jev-compatible)
 
-`laya.serve` exposes the `Router` over HTTP on the same `POST /v1/systemone`
-wire protocol as TypeSafe's hosted Jev API. Laya's answer payload is already
+`taut.serve` exposes the `Router` over HTTP on the same `POST /v1/systemone`
+wire protocol as TypeSafe's hosted Jev API. Taut's answer payload is already
 schema-identical to what Jev returns (`choice`/`score`/`noul` answers and a
 `{input_tokens, output_tokens}` usage block), so an existing Jev client — e.g.
 the [`hs-jev`](https://github.com/getmissionctrl/hs-jev) Haskell client — just
 needs its `baseUrl` repointed; nothing else changes.
 
 ```bash
-pip install "laya[serve]"          # adds fastapi + uvicorn
-LAYA_DEVICE=cuda LAYA_PRELOAD=1 laya-serve   # binds 0.0.0.0:8000, preloads all 3 checkpoints
+pip install "taut[serve]"          # adds fastapi + uvicorn
+TAUT_DEVICE=cuda TAUT_PRELOAD=1 taut-serve   # binds 0.0.0.0:8000, preloads all 3 checkpoints
 ```
 
 ```bash
@@ -329,12 +357,12 @@ curl -s localhost:8000/v1/systemone -H 'content-type: application/json' -d '{
 }'
 ```
 
-Configuration is by environment variable: `LAYA_HOST`, `LAYA_PORT`,
-`LAYA_DEVICE`, `LAYA_PRELOAD`, `LAYA_MODELS` (comma list to preload),
-`LAYA_THREADS` (cap torch intra-op threads for CPU inference — keep at or below
-physical cores), `LAYA_AUTO_TASK`, and `LAYA_API_KEY` (when set, clients must
+Configuration is by environment variable: `TAUT_HOST`, `TAUT_PORT`,
+`TAUT_DEVICE`, `TAUT_PRELOAD`, `TAUT_MODELS` (comma list to preload),
+`TAUT_THREADS` (cap torch intra-op threads for CPU inference — keep at or below
+physical cores), `TAUT_AUTO_TASK`, and `TAUT_API_KEY` (when set, clients must
 send `Authorization: Bearer <key>`). A client's `model` field is honoured when it
-names a Laya checkpoint (`english`/`multilingual`/`typed-decisions`), otherwise
+names a Taut checkpoint (`english`/`multilingual`/`typed-decisions`), otherwise
 the router auto-selects by script/language.
 
 ### Nix / NixOS
@@ -342,29 +370,29 @@ the router auto-selects by script/language.
 This repo is a flake. On a machine with an NVIDIA GPU:
 
 ```bash
-nix run .#laya-serve          # build (prebuilt CUDA torch, no compile) and serve
+nix run .#taut-serve          # build (prebuilt CUDA torch, no compile) and serve
 nix develop                   # dev shell: torch-bin, transformers, fastapi, pytest
 ```
 
 For a NixOS host, import the module and enable the service:
 
 ```nix
-# flake inputs:  laya.url = "github:<you>/laya";  # or path:/… on the same host
+# flake inputs:  taut.url = "github:<you>/taut";  # or path:/… on the same host
 {
-  imports = [ laya.nixosModules.default ];
-  services.laya-serve = {
+  imports = [ taut.nixosModules.default ];
+  services.taut-serve = {
     enable = true;
     host = "0.0.0.0";           # or bind to the Tailscale/LAN address
     openFirewall = true;
     device = "cuda";
     models = [ "english" "multilingual" "typed-decisions" ];
-    # apiKeyFile = config.age.secrets.laya-api-key.path;  # optional bearer auth
+    # apiKeyFile = config.age.secrets.taut-api-key.path;  # optional bearer auth
   };
 }
 ```
 
 The module runs a hardened `DynamicUser` systemd unit with CUDA device access,
-caches weights under `/var/lib/laya-serve`, and reads the bearer token (if any)
+caches weights under `/var/lib/taut-serve`, and reads the bearer token (if any)
 via `LoadCredential` so it never enters the store.
 
 ---
@@ -374,12 +402,12 @@ via `LoadCredential` so it never enters the store.
 If you only need a single checkpoint for a dedicated pipeline, you can load models directly:
 
 ```python
-import laya
+import taut
 
 # 1. Load a specific checkpoint directly from the hub
-agent = laya.load("convaiinnovations/laya")                           # English root
-agent_ml = laya.load("convaiinnovations/laya", subfolder="multilingual") # 100+ languages
-agent_td = laya.load("convaiinnovations/laya", subfolder="typed-decisions")
+agent = taut.load("thekarteek/taut")                           # English root
+agent_ml = taut.load("thekarteek/taut", subfolder="multilingual") # 100+ languages
+agent_td = taut.load("thekarteek/taut", subfolder="typed-decisions")
 
 # 2. Run all questions in ONE single forward pass (~35 ms on GPU)
 result = agent.predict(state, questions)
@@ -422,14 +450,14 @@ up; use it there only for API convenience.
 
 ## GPU Fast Path (TileLang)
 
-`pip install laya[fast]` adds an optional forward built from fused [TileLang](https://github.com/tile-ai/tilelang)
+`pip install taut[fast]` adds an optional forward built from fused [TileLang](https://github.com/tile-ai/tilelang)
 kernels: GEMM + bias/activation epilogues, GEMM + GEGLU, residual + LayerNorm, in-place RoPE, and a
 sliding-window flash attention that reads the packed QKV buffer directly. Weights stay resident in bf16
 and every (batch, length) bucket is captured as a CUDA graph, so a one-question call no longer pays
 ~200 kernel launches from Python.
 
 ```python
-agent = laya.load("convaiinnovations/laya", fast=True)   # or: agent.accelerate()
+agent = taut.load("thekarteek/taut", fast=True)   # or: agent.accelerate()
 agent.predict(state, questions)                            # same API, same answers
 ```
 
@@ -443,7 +471,7 @@ restores it. Kernels compile once per shape bucket on first use (a few seconds, 
 
 ## Automated Confidence Gating
 
-Because Laya's probabilities are trained with strictly proper scoring rules (RLCD), confidence scores are statistically meaningful:
+Because Taut's probabilities are trained with strictly proper scoring rules (RLCD), confidence scores are statistically meaningful:
 
 ```python
 dept = answers["department"]["choice"]
@@ -470,7 +498,7 @@ Every model in this space returns a score. A score is not an operating decision,
 gap between them is where the work actually is: someone still has to pick a cutoff, and
 own what it lets through.
 
-`laya.conformal` closes that gap. Give it a labelled held-out split and a risk budget, and
+`taut.conformal` closes that gap. Give it a labelled held-out split and a risk budget, and
 it returns a threshold with a **distribution-free, finite-sample guarantee** — valid for
 any data distribution, at the sample size you actually have, with no asymptotics and no
 assumption that the model is well calibrated:
@@ -478,7 +506,7 @@ assumption that the model is well calibrated:
 > at most 2% of incoming tickets are auto-handled incorrectly, with 95% confidence
 
 ```python
-from laya import Agent, ConformalGate, triage_questions
+from taut import Agent, ConformalGate, triage_questions
 
 agent = Agent()
 questions = triage_questions()
@@ -500,7 +528,7 @@ else:
 ```
 
 ```
-Laya conformal gate  alpha=0.02  delta=0.05  n=1200
+Taut conformal gate  alpha=0.02  delta=0.05  n=1200
 
 question               type      mode       operating point          guarantee
 ------------------------------------------------------------------------------
@@ -534,7 +562,7 @@ An exact binomial bound on `n` points cannot fall below `alpha` until
 confidence needs 59 labelled points, 2% needs 149, 1% needs 299.
 
 ```python
->>> from laya import min_calibration_size
+>>> from taut import min_calibration_size
 >>> min_calibration_size(0.01, 0.05)
 299
 ```
@@ -562,25 +590,25 @@ control, so the module refuses to let you.
 
 ### The gate ships without the model
 
-A fitted gate is JSON: thresholds and diagnostics, no weights. `laya.conformal` is pure
+A fitted gate is JSON: thresholds and diagnostics, no weights. `taut.conformal` is pure
 NumPy and imports neither torch nor transformers, so a gate can be fitted on a GPU box,
 committed to your repo, reviewed as a diff, and applied in an edge process that never
 loads a model.
 
 ```bash
-$ python -c "import laya, sys; laya.ConformalGate.load('triage_gate.json'); print('torch' in sys.modules)"
+$ python -c "import taut, sys; taut.ConformalGate.load('triage_gate.json'); print('torch' in sys.modules)"
 False
 ```
 
 ### Serve it, or run it from the shell
 
-Point `LAYA_GATE` at a saved gate and `laya-serve` stops being a scorer and becomes a
+Point `TAUT_GATE` at a saved gate and `taut-serve` stops being a scorer and becomes a
 decision service. The risk budget is the operator's, fixed at deploy time and readable
 from `/health` — deliberately not a request field, because a client that can name its own
 `alpha` can claim any guarantee it likes.
 
 ```bash
-LAYA_GATE=triage_gate.json laya-serve
+TAUT_GATE=triage_gate.json taut-serve
 ```
 
 ```jsonc
@@ -596,14 +624,14 @@ LAYA_GATE=triage_gate.json laya-serve
 
 A gate that will not load is fatal rather than a warning: a server configured to certify
 its answers and then quietly not doing so is the worst outcome available. Set
-`LAYA_GATE_STRICT=1` to reject requests carrying questions the gate was not calibrated on,
+`TAUT_GATE_STRICT=1` to reject requests carrying questions the gate was not calibrated on,
 instead of passing them through wearing no guarantee.
 
 From the shell:
 
 ```bash
-laya --gate triage_gate.json --report              # what does this gate certify?
-laya "billed twice" --predict --gate triage_gate.json
+taut --gate triage_gate.json --report              # what does this gate certify?
+taut "billed twice" --predict --gate triage_gate.json
 ```
 
 ```
@@ -622,7 +650,7 @@ the gate itself notices.
 `GateMonitor` does, without labels:
 
 ```python
-from laya import ConformalGate, GateMonitor
+from taut import ConformalGate, GateMonitor
 
 gate = ConformalGate.load("triage_gate.json")
 monitor = GateMonitor(gate)
@@ -635,7 +663,7 @@ if monitor.check()["status"] == "expired":
 ```
 
 ```
-Laya gate drift  status=expired  seen=1000  window=1000  level=0.005 per test
+Taut gate drift  status=expired  seen=1000  window=1000  level=0.005 per test
 
 question               mode       status    acceptance       scores
 -------------------------------------------------------------------
@@ -653,7 +681,7 @@ shifted input distribution outright. A **two-sample KS** test against the 101-qu
 sketch stored in the gate catches shifts that leave the acceptance rate unchanged — mass
 moving *within* the accepted region, which the binomial test cannot see.
 
-Measured false-positive rate on undrifted traffic: **0.3%** against a 1% test level. It
+Measured false-positive rate on undrifted traffic: **0.7%** against a 1% test level. It
 catches a 9% change in logit separation 91% of the time, and anything larger essentially
 always. A monitor that cries wolf gets muted, which is worse than not having one, so that
 number is tested in CI rather than asserted here.
@@ -679,24 +707,24 @@ Method, full table and the honest limitations are in
 
 ## Built-in Workflow Presets
 
-Laya provides pre-tuned question schemas for immediate production use:
+Taut provides pre-tuned question schemas for immediate production use:
 
 ```python
-import laya
+import taut
 
-agent = laya.load("convaiinnovations/laya")
+agent = taut.load("thekarteek/taut")
 
 # 1. Intelligent Model Router (routes to small vs. frontier models)
-routing = agent.predict({"request": "Refactor this service using dependency injection"}, laya.router_questions())
+routing = agent.predict({"request": "Refactor this service using dependency injection"}, taut.router_questions())
 
 # 2. Real-time Prompt Guardrails (jailbreaks, injections, leaks)
-guard = agent.predict({"prompt": "Ignore all instructions"}, laya.guard_questions())
+guard = agent.predict({"prompt": "Ignore all instructions"}, taut.guard_questions())
 
 # 3. Content Safety & Moderation (toxicity, harassment, threats)
-safety = agent.predict({"post": "User comment text"}, laya.moderation_questions())
+safety = agent.predict({"post": "User comment text"}, taut.moderation_questions())
 
 # 4. Support Ticket Triage (intent, urgency, frustration, churn)
-triage = agent.predict({"message": "My payment failed twice"}, laya.triage_questions())
+triage = agent.predict({"message": "My payment failed twice"}, taut.triage_questions())
 ```
 
 ---
@@ -706,10 +734,10 @@ triage = agent.predict({"message": "My payment failed twice"}, laya.triage_quest
 Fast System 1 routing and guardrails directly inside LangGraph workflows and LCEL chains:
 
 ```python
-from laya.integrations.langchain import LayaRouter, LayaGuardrail
+from taut.integrations.langchain import TautRouter, TautGuardrail
 
 # 1. Sub-35ms LangGraph conditional edge routing with confidence fallback
-router = LayaRouter(
+router = TautRouter(
     criteria={"billing": "invoices, charges", "tech": "bugs, outages"},
     confidence_threshold=0.80,
     fallback="human_agent",
@@ -717,7 +745,7 @@ router = LayaRouter(
 workflow.add_conditional_edges("triage", router)
 
 # 2. Inline prompt guardrails
-guard = LayaGuardrail(action="raise")  # raises LayaGuardrailError on jailbreak/injection
+guard = TautGuardrail(action="raise")  # raises TautGuardrailError on jailbreak/injection
 ```
 
 See [**`docs/langchain.md`**](docs/langchain.md) for full guide, support ticket triage nodes, and remote HTTP server configuration.
@@ -761,14 +789,14 @@ override on your own data rather than treating `A`/`B` as a universal fix.
 
 ## MCP Server (Optional)
 
-Laya can be exposed as an [MCP](https://modelcontextprotocol.io) stdio server, so any MCP
+Taut can be exposed as an [MCP](https://modelcontextprotocol.io) stdio server, so any MCP
 client (OpenClaw, Claude Desktop, Cursor, ...) can call typed decisions as tools
-(`laya_predict`, `laya_route`, `laya_preset`, `laya_status`) without writing glue code.
+(`taut_predict`, `taut_route`, `taut_preset`, `taut_status`) without writing glue code.
 This is an **optional extra**: the core package has no `mcp` dependency.
 
 ```bash
-pip install "laya[mcp]"
-laya-mcp-server          # or: python -m laya.mcp.server
+pip install "taut[mcp]"
+taut-mcp-server          # or: python -m taut.mcp.server
 ```
 
 Example MCP client configuration (stdio transport):
@@ -776,24 +804,24 @@ Example MCP client configuration (stdio transport):
 ```json
 {
   "mcpServers": {
-    "laya": {
-      "command": "laya-mcp-server",
-      "env": { "LAYA_DEVICE": "cpu" }
+    "taut": {
+      "command": "taut-mcp-server",
+      "env": { "TAUT_DEVICE": "cpu" }
     }
   }
 }
 ```
 
 The environment variables follow the contract documented at the top of
-[`laya/serve.py`](laya/serve.py), so the same variable has one meaning across the
+[`taut/serve.py`](taut/serve.py), so the same variable has one meaning across the
 package:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `LAYA_DEVICE` | (auto) | Same as `laya.serve`: the value is passed straight to torch |
-| `LAYA_PRELOAD` | `1` | Same as `laya.serve`: build the checkpoints at startup, not lazily |
-| `LAYA_MODELS` | `english,multilingual` | Comma list to preload (serve contract). MCP difference: an empty value preloads `english,multilingual` so `typed-decisions` stays lazy; in `laya.serve` empty means every checkpoint |
-| `LAYA_THREADS` | (torch default) | Same as `laya.serve`: cap torch intra-op threads for CPU inference; keep it at or below the physical core count |
+| `TAUT_DEVICE` | (auto) | Same as `taut.serve`: the value is passed straight to torch |
+| `TAUT_PRELOAD` | `1` | Same as `taut.serve`: build the checkpoints at startup, not lazily |
+| `TAUT_MODELS` | `english,multilingual` | Comma list to preload (serve contract). MCP difference: an empty value preloads `english,multilingual` so `typed-decisions` stays lazy; in `taut.serve` empty means every checkpoint |
+| `TAUT_THREADS` | (torch default) | Same as `taut.serve`: cap torch intra-op threads for CPU inference; keep it at or below the physical core count |
 
 The tools return structured JSON (answers with probabilities, routing metadata, device,
 `latency_ms`). As with the SDK, use it for structured decisions only; not for open Q&A or
@@ -804,21 +832,21 @@ text generation. Tests: `tests/test_mcp.py` (CI, no weights) and
 
 ## Benchmarks
 
-Community diagnostic: [Chinese workplace decisions (Feishu-style)](research/benchmarks/feishu_zh/README.md) · [中文说明](research/benchmarks/feishu_zh/README.zh-CN.md). Includes frozen synthetic cases, archived paired Laya/Jev responses, and an offline audit; separate from the benchmark suites below.
+Community diagnostic: [Chinese workplace decisions (Feishu-style)](research/benchmarks/feishu_zh/README.md) · [中文说明](research/benchmarks/feishu_zh/README.zh-CN.md). Includes frozen synthetic cases, archived paired Taut/Jev responses, and an offline audit; separate from the benchmark suites below.
 
 **Full report: [`BENCHMARKS.md`](BENCHMARKS.md)** — every run consolidated, languages and themes, with per-language detail for all 51 languages.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/NandhaKishorM/laya/main/assets/laya_benchmark.png" alt="Per-language accuracy for both checkpoints across 51 languages" width="100%" />
+  <img src="https://raw.githubusercontent.com/thedataengineer/taut/main/assets/taut_benchmark.png" alt="Per-language accuracy for both checkpoints across 51 languages" width="100%" />
 </p>
 
-All Laya numbers below are measured. Every model answered byte-identical questions
+All Taut numbers below are measured. Every model answered byte-identical questions
 (fixed seed) in the same run. Reproduce with
-[`research/scripts/laya_benchmark_colab.ipynb`](research/scripts/laya_benchmark_colab.ipynb) on a T4.
+[`research/scripts/taut_benchmark_colab.ipynb`](research/scripts/taut_benchmark_colab.ipynb) on a T4.
 
 ### Speed (Tesla T4, measured)
 
-| questions per call | `laya` | `laya-multilingual` |
+| questions per call | `taut` | `taut-multilingual` |
 |---|---|---|
 | 1 | 39.5 ms | **32.8 ms** |
 | 5 | 84.5 ms | **40.1 ms** |
@@ -828,16 +856,16 @@ All Laya numbers below are measured. Every model answered byte-identical questio
 Batched throughput reaches 103-332 questions/sec on a single T4. For reference, TypeSafe Jev
 has been independently measured at 236-276 ms p50
 ([AbdelStark](https://github.com/AbdelStark/jev-benchmarks),
-[nibzard](https://github.com/nibzard/decision-model-benchmark)) -- Laya answers a single
+[nibzard](https://github.com/nibzard/decision-model-benchmark)) -- Taut answers a single
 question roughly **6-7x faster**.
 
-### Laya (with routing) vs Jev
+### Taut (with routing) vs Jev
 
-Every Laya figure is what `Router().predict(...)` actually returns — the checkpoint the router
+Every Taut figure is what `Router().predict(...)` actually returns — the checkpoint the router
 selects for that input, not a hand-picked best of three. Jev figures are **third-party
 published, never measured here** (no TypeSafe API access), so sample sizes and prompts differ.
 
-| | Jev 1.13.0 | Laya (routed) | |
+| | Jev 1.13.0 | Taut (routed) | |
 |---|---|---|---|
 | typed-decisions, 2,000 decisions | 0.727 | **0.766** | +0.039 |
 | AG News, 4 labels | 0.910 | **0.950** | +0.040 |
@@ -854,9 +882,9 @@ failure for anything branching on confidence.
 
 #### Where Jev leads
 
-* **High-cardinality label spaces (>20 options at default settings):** On Banking77, Jev scores 0.870 (on 72 labels) while Laya scores 0.425 (on 77 labels at default 256-token head budget). This is an architectural token-budget constraint: options share a fixed `head_max_len` budget (192 tokens on English, 256 on multilingual), so 77 options receive only ~3 to 4 tokens per label, causing text to become indistinguishable. Jev supports up to 255 options out-of-the-box. While `laya-multilingual` supports 1,024 context (and up to 8,192 in the encoder) and you can raise `agent.cfg["head_max_len"] = 512` at runtime, Jev is currently better suited for 50+ options in a single prompt without tuning. `predict_shortlist` (see [Honest limits](#honest-limits)) keeps the top `k` labels with a caller-supplied embedding, then runs one forward pass on that shortlist.
-* **Soft distribution matching:** On typed-decisions, while Laya achieves higher argmax accuracy (0.766 vs 0.727), Jev achieves higher soft accuracy (0.580 vs 0.471) against the teacher's full probability distributions.
-* **Out-of-the-box raw calibration:** Before temperature scaling, the base checkpoint has higher raw ECE (0.213 vs 0.144). Laya achieves its 0.081 ECE after domain temperature fitting.
+* **High-cardinality label spaces (>20 options at default settings):** On Banking77, Jev scores 0.870 (on 72 labels) while Taut scores 0.425 (on 77 labels at default 256-token head budget). This is an architectural token-budget constraint: options share a fixed `head_max_len` budget (192 tokens on English, 256 on multilingual), so 77 options receive only ~3 to 4 tokens per label, causing text to become indistinguishable. Jev supports up to 255 options out-of-the-box. While `taut-multilingual` supports 1,024 context (and up to 8,192 in the encoder) and you can raise `agent.cfg["head_max_len"] = 512` at runtime, Jev is currently better suited for 50+ options in a single prompt without tuning. `predict_shortlist` (see [Honest limits](#honest-limits)) keeps the top `k` labels with a caller-supplied embedding, then runs one forward pass on that shortlist.
+* **Soft distribution matching:** On typed-decisions, while Taut achieves higher argmax accuracy (0.766 vs 0.727), Jev achieves higher soft accuracy (0.580 vs 0.471) against the teacher's full probability distributions.
+* **Out-of-the-box raw calibration:** Before temperature scaling, the base checkpoint has higher raw ECE (0.213 vs 0.144). Taut achieves its 0.081 ECE after domain temperature fitting.
 
 Full detail, including every workflow and all 51 languages: **[`BENCHMARKS.md`](BENCHMARKS.md)**.
 
@@ -866,9 +894,9 @@ Full detail, including every workflow and all 51 languages: **[`BENCHMARKS.md`](
 
 | model | accuracy | soft acc | Brier | ECE | score MAE |
 |---|---|---|---|---|---|
-| **`laya-typed-decisions`** | **0.766** | 0.471 | **0.062** | 0.213 | **0.242** |
-| `laya` | 0.362 | 0.332 | 0.316 | 0.175 | 0.694 |
-| `laya-multilingual` | 0.342 | 0.326 | 0.439 | 0.285 | 0.687 |
+| **`taut-typed-decisions`** | **0.766** | 0.471 | **0.062** | 0.213 | **0.242** |
+| `taut` | 0.362 | 0.332 | 0.316 | 0.175 | 0.694 |
+| `taut-multilingual` | 0.342 | 0.326 | 0.439 | 0.285 | 0.687 |
 | *Jev 1.13.0 (published)* | *0.727* | *0.580* | *0.148* | *0.144* | *0.391* |
 | *teacher self-agreement ceiling* | *0.735* | | | | |
 | *per-question majority class* | *0.461* | | | | |
@@ -888,7 +916,7 @@ All of the capability on this benchmark comes from fine-tuning.
 
 ### Multilingual (51 languages, MASSIVE intent, 20 options, random = 0.050)
 
-| | `laya` | `laya-multilingual` |
+| | `taut` | `taut-multilingual` |
 |---|---|---|
 | English | **0.783** | 0.657 |
 | 13 other languages | 0.306 | **0.451** |
@@ -903,7 +931,7 @@ forward pass.
 
 ### English tasks
 
-| task | `laya` | `laya-multilingual` | note |
+| task | `taut` | `taut-multilingual` | note |
 |---|---|---|---|
 | AG News | **0.947** | 0.937 | in training mix |
 | BoolQ | **0.830** | 0.787 | in training mix |
@@ -914,8 +942,8 @@ forward pass.
 ### Calibration
 
 Both checkpoints are over-confident as shipped. Refitting one temperature per (question type,
-option count) on held-out data moves mean ECE **0.466 -> 0.081** (`laya`) and
-**0.314 -> 0.106** (`laya-multilingual`). `laya-multilingual` ships with no fitted
+option count) on held-out data moves mean ECE **0.466 -> 0.081** (`taut`) and
+**0.314 -> 0.106** (`taut-multilingual`). `taut-multilingual` ships with no fitted
 temperatures at all, so fit them before relying on its probabilities.
 
 At checkpoint load, numeric temperature entries are clamped to `[0.5, 5.0]`; invalid or
@@ -929,22 +957,22 @@ failure; it does not establish calibrated confidence.
 
 * **The base checkpoints are near chance on typed-decisions zero-shot** -- 0.362 and 0.352
   against a 0.318 random baseline and a 0.461 majority-class baseline. The 0.766 figure comes
-  from the checkpoint fine-tuned on that benchmark's own training split. Laya is a fast base to
+  from the checkpoint fine-tuned on that benchmark's own training split. Taut is a fast base to
   specialise, not a zero-shot decision engine.
 * **Avoid boolean-word labels in `choice` questions.** Choice keys are rendered verbatim, and the
   current checkpoints can follow labels such as `true`/`false` or `yes`/`no` instead of the option
   descriptions. Use semantic labels or opaque labels such as `A`/`B`, and validate them on the
   checkpoint and states you serve.
 * **High-cardinality choice questions and token budgets:** Sequences split into an option prompt budget (`head_max_len`) and the remaining document/state budget (`max_len - head_max_len`):
-  * `laya` (English) defaults to 512 context (`head_max_len = 192`, ~320 tokens for state).
-  * `laya-multilingual` and `laya-typed-decisions` default to 1,024 context (`head_max_len = 256`, ~768 tokens for state; mmBERT-base encoder supports up to 8,192 with RoPE).
+  * `taut` (English) defaults to 512 context (`head_max_len = 192`, ~320 tokens for state).
+  * `taut-multilingual` and `taut-typed-decisions` default to 1,024 context (`head_max_len = 256`, ~768 tokens for state; mmBERT-base encoder supports up to 8,192 with RoPE).
   At default settings, a 77-option question like Banking77 allocates only `(256 - 16) // 77` ≈ 3–4 tokens per label, which causes accuracy to fall off sharply (0.425 vs Jev's 0.870). If evaluating 50+ options in a single question:
   1. Raise `agent.cfg["head_max_len"] = 512` and `agent.cfg["max_len"] = 1024` (or up to 2048 / 4096 / 8192) so every option has enough tokens to remain distinct.
   2. Or shortlist with embeddings and run one forward pass on the top `k` labels (`predict_shortlist`, example below). `predict` and `system_one` still score every criterion they are given.
   3. Or split the label set yourself into a coarse question and a fine question.
 
 ```python
-import laya
+import taut
 
 questions = {
     "intent": {
@@ -957,11 +985,11 @@ questions = {
         },
     }
 }
-result = laya.predict_shortlist(
+result = taut.predict_shortlist(
     agent,
     {"text": "I was charged twice for a transfer"},
     questions,
-    embed_fn=laya.embed_fn_from_agent(agent),  # or any callable: texts -> (n, dim)
+    embed_fn=taut.embed_fn_from_agent(agent),  # or any callable: texts -> (n, dim)
     k=20,
 )
 result["shortlist"]["intent"]["labels"]  # the top 20 labels sent to the model
@@ -972,7 +1000,7 @@ result["shortlist"]["intent"]["labels"]  # the top 20 labels sent to the model
 [Issue #102](https://github.com/NandhaKishorM/laya/issues/102) reports that a top-20 zero-shot shortlist moved a BANKING77 run from 54.3% to 60.8% on the reporter's setup. Those figures are the reporter's; this repository has not remeasured them.
 
 * Ordinal `score` questions are the weakest primitive (SST-5 0.372).
-* **`noul` can follow its option labels instead of the state, most strongly on `laya` (English).** `noul` renders its two options as `false:` / `true:` by default, and on the English checkpoint that label pair can dominate the answer, returning a confident "no" for clearly positive input (#156). Until a retrained checkpoint lands, check `noul` answers on your own data. You can override the model-facing pair while keeping the `noul` result as P(true):
+* **`noul` can follow its option labels instead of the state, most strongly on `taut` (English).** `noul` renders its two options as `false:` / `true:` by default, and on the English checkpoint that label pair can dominate the answer, returning a confident "no" for clearly positive input (#156). Until a retrained checkpoint lands, check `noul` answers on your own data. You can override the model-facing pair while keeping the `noul` result as P(true):
 
   ```python
   {"type": "noul", "instructions": "Is this review positive?",
@@ -987,36 +1015,36 @@ result["shortlist"]["intent"]["labels"]  # the top 20 labels sent to the model
   {"type": "choice", "instructions": "Is this review positive?",
    "criteria": {"A": "yes, the review is positive", "B": "no, the review is negative"}}
   ```
-* **`laya-multilingual` has a position bias on `score` questions** (#131): it rarely picks the first-listed level, in any language. For English score questions, route to `model="english"`, and for other languages validate score outputs on your own data before relying on them.
+* **`taut-multilingual` has a position bias on `score` questions** (#131): it rarely picks the first-listed level, in any language. For English score questions, route to `model="english"`, and for other languages validate score outputs on your own data before relying on them.
 * **`action.act_probability` carries no usable signal yet** (#185). It reads 1.0 for almost every input, and its raw logits run against correctness (AUROC 0.30 on 396 labelled decisions). Gate on `confidence` instead, which reaches an AUROC of 0.77 on the same items.
-* `laya` collapses outside English; `laya-multilingual` is weaker on English. Route, or pick
+* `taut` collapses outside English; `taut-multilingual` is weaker on English. Route, or pick
   deliberately.
 
 ---
 
 ## Community Tools
 
-* **[omp-laya-judge](https://github.com/F0Rextasy/omp-laya-judge)**: an [oh-my-pi](https://github.com/can1357/oh-my-pi) plugin with a local System-1 judge MCP server and skill (`choice`/`bool`/`score`, 0 tokens, about 0.3 s on CPU), confidence-gated escalation, and reproducible quiz and Snake demos.
-* **[laya-adk-toolkit](https://github.com/Ashfaqbs/laya-adk-toolkit)**: [Google ADK](https://google.github.io/adk-docs/) tools that let an agent call Laya's `classify`/`score`/`detect` typed decisions directly as tools, instead of asking an LLM to guess at structured output.
-* **[laya-Ascend](https://github.com/zzhdbw/laya-Ascend)**: Laya on Huawei Ascend NPUs through `torch-npu`, with a CPU vs NPU benchmark (34x to 71x faster at batch size 1), a setup guide, and Snake and Tetris demos.
+* **[omp-taut-judge](https://github.com/F0Rextasy/omp-taut-judge)**: an [oh-my-pi](https://github.com/can1357/oh-my-pi) plugin with a local System-1 judge MCP server and skill (`choice`/`bool`/`score`, 0 tokens, about 0.3 s on CPU), confidence-gated escalation, and reproducible quiz and Snake demos.
+* **[taut-adk-toolkit](https://github.com/Ashfaqbs/taut-adk-toolkit)**: [Google ADK](https://google.github.io/adk-docs/) tools that let an agent call Taut's `classify`/`score`/`detect` typed decisions directly as tools, instead of asking an LLM to guess at structured output.
+* **[taut-Ascend](https://github.com/zzhdbw/taut-Ascend)**: Taut on Huawei Ascend NPUs through `torch-npu`, with a CPU vs NPU benchmark (34x to 71x faster at batch size 1), a setup guide, and Snake and Tetris demos.
 
 ---
 
 ## Live Demo & Resources
 
-* **Hugging Face Model:** [convaiinnovations/laya](https://huggingface.co/convaiinnovations/laya)
-* **Interactive Web Demo:** [convaiinnovations/laya-demo](https://huggingface.co/spaces/convaiinnovations/laya-demo)
-* **Engineering Writeup:** [Read the full story on Dev.to](https://dev.to/nandakishor_m_6cc0adfde9f/i-built-non-autoregressive-decision-models-a-year-ago-then-a-frontier-lab-called-it-a-18me)
+* **Hugging Face Model:** [thekarteek/taut](https://huggingface.co/thekarteek/taut)
+* **Source:** [thedataengineer/taut](https://github.com/thedataengineer/taut)
+* **Upstream project:** [NandhaKishorM/laya](https://github.com/NandhaKishorM/laya) — the encoder, the training recipe, and the interactive demo of the original checkpoints
 
 ---
 
 ## Fine-Tuning
 
-Fine-tune Laya on your own domain data. The notebook runs on Kaggle's free 2xT4 GPUs and does
+Fine-tune Taut on your own domain data. The notebook runs on Kaggle's free 2xT4 GPUs and does
 the whole loop: build the dataset, train with RLCD (proper-scoring-rule rewards, GRPO-style
 policy gradient), fit calibration temperatures, evaluate, and push the result to the Hub.
 
-* **[`notebooks/laya_finetune_typed_decisions_2xT4_kaggle.ipynb`](notebooks/laya_finetune_typed_decisions_2xT4_kaggle.ipynb)**
+* **[`notebooks/taut_finetune_typed_decisions_2xT4_kaggle.ipynb`](notebooks/taut_finetune_typed_decisions_2xT4_kaggle.ipynb)**
 
 The notebook enables gradient checkpointing on both the encoder and the decision head.
 For custom training loops, `model.head_checkpointing = True` enables activation
@@ -1040,7 +1068,7 @@ Run the CPU-only regression checks with `python tests/test_calibration_persisten
 Fine-tuning is where most of the value is. On the typed-decisions benchmark the base
 checkpoints score near chance zero-shot (0.36 and 0.35 against a 0.318 random baseline),
 while the fine-tuned checkpoint reaches **0.766** on the same 2,000 decisions -- above
-TypeSafe Jev's published 0.727 and above the 0.735 teacher self-agreement ceiling. Treat Laya
+TypeSafe Jev's published 0.727 and above the 0.735 teacher self-agreement ceiling. Treat Taut
 as a fast base to specialise, not as a zero-shot decision engine.
 
 Runtime on 2xT4 is roughly 4-5 hours for 4 epochs over ~30k questions.
@@ -1048,28 +1076,38 @@ Runtime on 2xT4 is roughly 4-5 hours for 4 epochs over ~30k questions.
 ### Worked example: a browser-agent decision head
 
 [`docs/finetune_browser_agent.md`](docs/finetune_browser_agent.md) records a complete specialisation
-on a single 16 GB GPU with no paid API: Laya as the operation/target decider for
+on a single 16 GB GPU with no paid API: Taut as the operation/target decider for
 [browser-use/jev-ultrafast](https://github.com/browser-use/jev-ultrafast) (same request format as
 TypeSafe Jev). Element top-1 among ~45 candidates goes from 0.10 zero-shot to 0.66, real-task
 success from 0 % to 62 % at 17-23 ms per step; weights, pipeline code and per-run results are on
-the Hub at [cklxx/laya-browser](https://huggingface.co/cklxx/laya-browser). The write-up covers the
+the Hub at [cklxx/taut-browser](https://huggingface.co/cklxx/taut-browser). The write-up covers the
 data recipe (reverse-generated goals, executed DONE states, Mind2Web, on-policy corrections), the
 input-format change that mattered most, and the things that did not work.
 
 ---
 
-## Support the Project
-
-If Laya helps your research or products, consider supporting independent research:
-
-<p align="left">
-  <a href="https://www.buymeacoffee.com/nandakishorm" target="_blank">
-    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=nandakishorm&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me A Coffee" />
-  </a>
-</p>
-
----
-
 ## License
 
-Apache 2.0. Developed by Convai Innovations.
+Apache 2.0.
+
+## Attribution
+
+Taut is a fork of [Laya](https://github.com/NandhaKishorM/laya), developed by Convai
+Innovations and released under Apache 2.0. The encoder architecture, the RLCD training
+recipe, the checkpoints, the router, the language detection and the e-mail cleaning are
+upstream's work, and the benchmark numbers in [BENCHMARKS.md](BENCHMARKS.md) measure
+upstream's checkpoints.
+
+The checkpoints published at [`thekarteek/taut*`](https://huggingface.co/thekarteek/taut)
+are mirrors of upstream's Apache-2.0 weights, republished unmodified so this package has a
+stable home for them. Nothing about the model has been retrained or altered.
+
+What this fork adds, and is responsible for:
+
+- `taut.conformal` — certified risk control over the decisions
+- `taut.drift` — label-free detection of an expired gate
+- the gate surface in the server (`TAUT_GATE`) and the CLI (`--gate`, `--report`)
+- `research/conformal/` — the validation that the bound actually holds
+
+Issue links in the source that point at `NandhaKishorM/laya` are deliberate: they record
+where a fix came from.

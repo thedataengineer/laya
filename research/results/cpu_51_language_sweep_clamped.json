@@ -1,11 +1,11 @@
 {
   "why": "#208: the committed 51-language sweep's `ece` and `mean_confidence` columns were produced before #42 clamped temperatures to [0.5, 5]. This file re-runs the same 51 languages and the same 5,100 cases with the current package, in both regimes, so the two can be compared like for like. `accuracy` and `macro_f1` are unchanged, because a temperature-scaled softmax has the same argmax for every positive T.",
   "how": [
-    "research/eval/laya_eval.py --model convaiinnovations/laya --langs all --per-lang 100 --n-opts 20 --device cpu --unclamped",
-    "research/eval/laya_eval.py --model convaiinnovations/laya --langs all --per-lang 100 --n-opts 20 --device cpu"
+    "research/eval/taut_eval.py --model thekarteek/taut --langs all --per-lang 100 --n-opts 20 --device cpu --unclamped",
+    "research/eval/taut_eval.py --model thekarteek/taut --langs all --per-lang 100 --n-opts 20 --device cpu"
   ],
   "config": {
-    "model": "convaiinnovations/laya",
+    "model": "thekarteek/taut",
     "subfolder": null,
     "dataset": "mteb/amazon_massive_intent",
     "split": "test",
@@ -17,7 +17,7 @@
     "head_max_len": 192,
     "max_len": 512,
     "instructions": "What is the user asking for in `utterance`?",
-    "laya_version": "0.3.7",
+    "taut_version": "0.3.7",
     "n_cases": 5100
   },
   "temperature_choice_11_plus": {
@@ -1428,6 +1428,6 @@
       "seconds",
       "dropped"
     ],
-    "note": "the committed file stores these and research/eval/laya_eval.py does not, so this re-run covers the six comparable columns rather than replacing the file"
+    "note": "the committed file stores these and research/eval/taut_eval.py does not, so this re-run covers the six comparable columns rather than replacing the file"
   }
 }

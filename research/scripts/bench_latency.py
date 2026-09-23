@@ -26,14 +26,14 @@ import torch  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(REPO))
 
-import laya  # noqa: E402
-from laya.lang import analyse  # noqa: E402
-from laya.router import Router  # noqa: E402
+import taut  # noqa: E402
+from taut.lang import analyse  # noqa: E402
+from taut.router import Router  # noqa: E402
 
-ROOT = os.path.expanduser("~/laya_models")
-MODELS = {"english": os.path.join(ROOT, "laya"),
-          "multilingual": os.path.join(ROOT, "laya-multilingual"),
-          "typed-decisions": os.path.join(ROOT, "laya-typed-decisions")}
+ROOT = os.path.expanduser("~/taut_models")
+MODELS = {"english": os.path.join(ROOT, "taut"),
+          "multilingual": os.path.join(ROOT, "taut-multilingual"),
+          "typed-decisions": os.path.join(ROOT, "taut-typed-decisions")}
 OUT = os.path.join(REPO, "latency_benchmark_results.json")
 
 STATE_EN = {"ticket": {"subject": "Payout failing", "messages": [{"from": "customer",
@@ -66,9 +66,9 @@ def timed(fn, warmup=3, reps=15):
 def main():
     res = {"meta": {"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "device": "cpu",
                     "torch": torch.__version__, "threads": torch.get_num_threads(),
-                    "laya": laya.__version__,
+                    "taut": taut.__version__,
                     "note": "CPU numbers. GPU (T4) reference from the Colab run is in "
-                            "laya_benchmark_results.json -> latency."}}
+                            "taut_benchmark_results.json -> latency."}}
 
     # ---------------------------------------------------------------- 1. detection overhead
     print("=== 1. language detection overhead (no model) ===", flush=True)
@@ -85,7 +85,7 @@ def main():
     raw, load_times = {}, {}
     for mname, path in MODELS.items():
         t = time.perf_counter()
-        ag = laya.load(path, device="cpu")
+        ag = taut.load(path, device="cpu")
         load_times[mname] = round((time.perf_counter() - t) * 1000, 1)
         per = {}
         for n in (1, 5, 10, 50):

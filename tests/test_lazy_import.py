@@ -1,4 +1,4 @@
-"""`import laya` must not import torch; torch-backed names stay lazy.
+"""`import taut` must not import torch; torch-backed names stay lazy.
 
 The pure-Python surface (routing, language detection, email cleaning) has to be usable
 without torch installed. The torch-backed names must still resolve when it is available.
@@ -31,20 +31,20 @@ class Blocker:
         return None
 sys.meta_path.insert(0, Blocker())
 
-import laya
-assert "torch" not in sys.modules, "import laya pulled in torch"
-# `laya.serve` (#31) defers fastapi/uvicorn/torch into its functions, so importing it must
+import taut
+assert "torch" not in sys.modules, "import taut pulled in torch"
+# `taut.serve` (#31) defers fastapi/uvicorn/torch into its functions, so importing it must
 # stay cheap too -- otherwise the lazy package init buys nothing for the server entry point.
-import laya.serve  # noqa: F401
-assert "torch" not in sys.modules, "import laya.serve pulled in torch"
-script = laya.detect_script("The customer was charged twice")
+import taut.serve  # noqa: F401
+assert "torch" not in sys.modules, "import taut.serve pulled in torch"
+script = taut.detect_script("The customer was charged twice")
 try:
-    laya.Agent
+    taut.Agent
     agent = "resolved-without-torch"
 except ImportError:
     agent = "blocked"
 try:
-    laya.shortlist_choice
+    taut.shortlist_choice
     sh = "resolved-without-torch"
 except ImportError:
     sh = "blocked"
@@ -52,7 +52,7 @@ print(script, agent, sh)
 ''' % ROOT
 
 proc = subprocess.run([sys.executable, "-c", PROBE], capture_output=True, text=True)
-check("no-torch/import laya succeeds", proc.returncode, 0)
+check("no-torch/import taut succeeds", proc.returncode, 0)
 out = proc.stdout.strip().split()
 check("no-torch/detect_script works", out[0] if out else None, "latin")
 check("no-torch/Agent stays lazy", out[1] if len(out) > 1 else None, "blocked")
@@ -60,12 +60,12 @@ check("no-torch/shortlist stays lazy", out[2] if len(out) > 2 else None, "blocke
 
 
 # ------------------------------------------------------------------ torch available
-import laya  # noqa: E402
+import taut  # noqa: E402
 
-missing = [n for n in laya.__all__ if not hasattr(laya, n)]
+missing = [n for n in taut.__all__ if not hasattr(taut, n)]
 check("all __all__ names resolve with torch", missing, [])
-check("from-import of a lazy name", laya.Agent.__name__, "Agent")
-check("__dir__ lists lazy names", "load" in dir(laya), True)
+check("from-import of a lazy name", taut.Agent.__name__, "Agent")
+check("__dir__ lists lazy names", "load" in dir(taut), True)
 
 
 print("\n%d passed, %d failed" % (len(PASS), len(FAIL)))

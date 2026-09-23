@@ -1,8 +1,8 @@
-"""Local extensive benchmark of the three Laya checkpoints.
+"""Local extensive benchmark of the three Taut checkpoints.
 
 Part A  MASSIVE intent across every language the dataset ships (~51), 20-option choice.
 Part B  typed-decisions (400 cases / 2,000 decisions) on all three checkpoints, so the
-        fine-tuned laya-typed-decisions can be compared with Jev's published 0.727 on the
+        fine-tuned taut-typed-decisions can be compared with Jev's published 0.727 on the
         same benchmark.
 
 Writes local_benchmark_results.json.
@@ -29,13 +29,13 @@ import torch  # noqa: E402
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(REPO))
 
-import laya  # noqa: E402
-from laya.common import QTYPES, build_sequence, collate_items, render_options, temp_bucket  # noqa: E402
+import taut  # noqa: E402
+from taut.common import QTYPES, build_sequence, collate_items, render_options, temp_bucket  # noqa: E402
 
-ROOT = os.path.expanduser("~/laya_models")
-MODELS = {"english": os.path.join(ROOT, "laya"),
-          "multilingual": os.path.join(ROOT, "laya-multilingual"),
-          "typed-decisions": os.path.join(ROOT, "laya-typed-decisions")}
+ROOT = os.path.expanduser("~/taut_models")
+MODELS = {"english": os.path.join(ROOT, "taut"),
+          "multilingual": os.path.join(ROOT, "taut-multilingual"),
+          "typed-decisions": os.path.join(ROOT, "taut-typed-decisions")}
 OUT = os.path.join(REPO, "local_benchmark_results.json")
 SEED, N_OPTS = 13, 20
 
@@ -145,7 +145,7 @@ def metrics(rows):
 
 
 def load(name):
-    ag = laya.load(MODELS[name], device="cpu")
+    ag = taut.load(MODELS[name], device="cpu")
     ag.model.eval()
     return ag
 
@@ -257,7 +257,7 @@ def run_part_b(results):
     results["part_b"] = {"reference_points": {
         "jev_1.13.0_published": {"accuracy": 0.727, "soft_accuracy": 0.580, "brier": 0.148,
                                  "ece": 0.144, "score_mae": 0.391, "ms_per_case": 710,
-                                 "source": "figure quoted in the laya repo's own comparison table"},
+                                 "source": "figure quoted in the taut repo's own comparison table"},
         "teacher_self_agreement_ceiling": {"accuracy": 0.735},
         "modernbert_base_specialist": {"accuracy": 0.646},
         "random_guess": {"accuracy": 0.3175},
@@ -315,7 +315,7 @@ def main():
     a = ap.parse_args()
 
     results = {"meta": {"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "device": "cpu",
-                        "torch": torch.__version__, "laya": laya.__version__,
+                        "torch": torch.__version__, "taut": taut.__version__,
                         "threads": torch.get_num_threads()}}
     if os.path.exists(OUT):
         try:

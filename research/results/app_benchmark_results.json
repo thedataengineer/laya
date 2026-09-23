@@ -4,7 +4,7 @@
     "device": "cpu",
     "n_per_task": 400,
     "seed": 13,
-    "laya": "0.2.1"
+    "taut": "0.2.1"
   },
   "jev_published": {
     "ag_news": {
@@ -38,7 +38,7 @@
       "ece": 0.144,
       "score_mae": 0.391,
       "ms_per_case": 710,
-      "source": "laya repo comparison table"
+      "source": "taut repo comparison table"
     },
     "_independent_": {
       "banking77_accuracy": 0.763,

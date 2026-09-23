@@ -1,6 +1,6 @@
 import unittest
-from laya.agent import Agent
-from laya.common import render_options
+from taut.agent import Agent
+from taut.common import render_options
 
 class CriteriaTests(unittest.TestCase):
     def test_noul_criteria_boolean_keys(self):

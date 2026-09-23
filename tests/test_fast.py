@@ -9,7 +9,7 @@ torch = pytest.importorskip("torch")
 if not torch.cuda.is_available():
     pytest.skip("needs CUDA", allow_module_level=True)
 pytest.importorskip("tilelang")
-from laya import tl_kernels as K  # noqa: E402
+from taut import tl_kernels as K  # noqa: E402
 
 dev = "cuda"
 def err(a, b): return (a.float() - b.float()).abs().max().item()
@@ -65,11 +65,11 @@ def test_attention_mask_and_window():
         assert (O.float() - ref)[valid].abs().max().item() < 0.02
 
 
-@pytest.mark.skipif(os.environ.get("LAYA_TEST_MODEL") is None, reason="set LAYA_TEST_MODEL=<repo or path> to run")
+@pytest.mark.skipif(os.environ.get("TAUT_TEST_MODEL") is None, reason="set TAUT_TEST_MODEL=<repo or path> to run")
 def test_full_forward_matches_stock():
-    import laya
-    from laya.common import QTYPES, build_sequence, collate_items
-    agent = laya.load(os.environ["LAYA_TEST_MODEL"], subfolder=os.environ.get("LAYA_TEST_SUBFOLDER"))
+    import taut
+    from taut.common import QTYPES, build_sequence, collate_items
+    agent = taut.load(os.environ["TAUT_TEST_MODEL"], subfolder=os.environ.get("TAUT_TEST_SUBFOLDER"))
     q = {"dept": {"type": "choice", "instructions": "Which team?", "criteria": {"billing": "refunds", "tech": "bugs", "sales": "pricing"}},
          "urg": {"type": "score", "instructions": "How urgent?", "criteria": ["low", "mid", "high"]},
          "churn": {"type": "noul", "instructions": "Threatens to cancel?"}}

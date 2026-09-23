@@ -1,8 +1,8 @@
 """Distribution-free risk control: the bound, the walk, the gate, and its guarantees.
 
-No model weights and no torch. `laya.conformal` is pure NumPy by design -- a gate is
+No model weights and no torch. `taut.conformal` is pure NumPy by design -- a gate is
 fitted, serialised and applied without loading anything -- so these tests exercise the
-real code paths against synthetic Laya answers.
+real code paths against synthetic Taut answers.
 
 The statistical checks here are smoke-sized so CI stays fast. The full validation, 1000
 trials per configuration scored against population risk rather than a sampled estimate,
@@ -18,7 +18,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from laya.conformal import (  # noqa: E402
+from taut.conformal import (  # noqa: E402
     ConformalGate,
     QuestionGate,
     binomial_upper_bound,
@@ -209,7 +209,7 @@ ok("quantile/carries the (n+1) correction",
    conformal_quantile(np.arange(100.0), 0.1)[0] >= np.quantile(np.arange(100.0), 0.9))
 
 
-# ------------------------------------------------------------------ synthetic Laya answers
+# ------------------------------------------------------------------ synthetic Taut answers
 def choice_answer(p, keys):
     return {"type": "choice", "choice": keys[int(np.argmax(p))],
             "probabilities": {k: float(v) for k, v in zip(keys, p)},
@@ -490,7 +490,7 @@ ok("json/a NaN diagnostic round trips as null",
 future = gate.to_dict()
 future["schema_version"] = 99
 raises("json/refuses a newer schema", lambda: ConformalGate.from_dict(future),
-       "newer Laya")
+       "newer Taut")
 
 # ------------------------------------------------------------------ reporting and dunders
 rep = gate.report()
@@ -507,13 +507,13 @@ ok("dunder/repr names the size", "3 questions" in repr(gate))
 ok("dunder/question repr names the mode", "mode=set" in repr(gate["intent"]))
 
 # ------------------------------------------------------------------ package surface
-import laya  # noqa: E402
+import taut  # noqa: E402
 
 for name in ("ConformalGate", "QuestionGate", "selective_threshold", "miss_threshold",
              "min_calibration_size", "binomial_upper_bound"):
-    ok("export/%s is in __all__" % name, name in laya.__all__)
-    ok("export/%s resolves" % name, getattr(laya, name) is not None)
-check("export/ConformalGate is the real class", laya.ConformalGate, ConformalGate)
+    ok("export/%s is in __all__" % name, name in taut.__all__)
+    ok("export/%s resolves" % name, getattr(taut, name) is not None)
+check("export/ConformalGate is the real class", taut.ConformalGate, ConformalGate)
 
 # The module is pure NumPy: a gate must be usable in a process with no torch at all.
 import subprocess  # noqa: E402
@@ -527,8 +527,8 @@ class Blocker:
             raise ImportError("torch blocked")
         return None
 sys.meta_path.insert(0, Blocker())
-import laya
-g = laya.ConformalGate.load(%r)
+import taut
+g = taut.ConformalGate.load(%r)
 out = g.apply({"answers": {"unsafe": {"type": "noul", "noul": 0.9, "confidence": 0.9}}})
 assert "torch" not in sys.modules, "applying a gate pulled in torch"
 print("ok", out["answers"]["unsafe"]["gate"]["mode"])

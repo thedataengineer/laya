@@ -1,5 +1,5 @@
 {
-  description = "laya + laya-serve: a self-hosted, TypeSafe Jev-compatible System-1 decision server";
+  description = "taut + taut-serve: a self-hosted, TypeSafe Jev-compatible System-1 decision server";
 
   inputs = {
     # Pinned to the same rev missionctrl-infra uses, so hq's binary cache
@@ -10,20 +10,20 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     let
-      # Overlay exposing `laya` + `laya-serve`, built from ./nix/package.nix.
+      # Overlay exposing `taut` + `taut-serve`, built from ./nix/package.nix.
       overlay = final: prev:
         let p = final.callPackage ./nix/package.nix { };
-        in { inherit (p) laya laya-serve; };
+        in { inherit (p) taut taut-serve; };
     in
     {
       overlays.default = overlay;
 
       # The module builds its package from the host's own `pkgs` (see
-      # nix/laya-serve.nix), so it works even on hosts that inject `pkgs` via
+      # nix/taut-serve.nix), so it works even on hosts that inject `pkgs` via
       # specialArgs and ignore module-level `nixpkgs.overlays` — no overlay
       # required here.
-      nixosModules.default = ./nix/laya-serve.nix;
-      nixosModules.laya-serve = ./nix/laya-serve.nix;
+      nixosModules.default = ./nix/taut-serve.nix;
+      nixosModules.taut-serve = ./nix/taut-serve.nix;
     }
     // flake-utils.lib.eachDefaultSystem (system:
       let
@@ -35,9 +35,9 @@
       in
       {
         packages = {
-          default = pkgs.laya-serve;
-          laya-serve = pkgs.laya-serve;
-          laya = pkgs.laya;
+          default = pkgs.taut-serve;
+          taut-serve = pkgs.taut-serve;
+          taut = pkgs.taut;
         };
 
         devShells.default = pkgs.mkShell {
@@ -58,7 +58,7 @@
             export PYTHONPATH="$PWD:$PYTHONPATH"
             # torch-bin's CUDA needs the host NVIDIA userspace driver.
             export LD_LIBRARY_PATH="/run/opengl-driver/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-            echo "laya dev shell — python $(python --version 2>&1 | cut -d' ' -f2), torch $(python -c 'import torch; print(torch.__version__)' 2>/dev/null)"
+            echo "taut dev shell — python $(python --version 2>&1 | cut -d' ' -f2), torch $(python -c 'import torch; print(torch.__version__)' 2>/dev/null)"
           '';
         };
       });

@@ -1,4 +1,4 @@
-# Laya benchmarks
+# Taut benchmarks
 
 Every checkpoint answered **byte-identical questions** in each run (fixed seed). Jev figures are **third-party published, never measured here** — no TypeSafe API access — so sample sizes and prompts differ; treat them as indicative.
 
@@ -6,7 +6,7 @@ Every checkpoint answered **byte-identical questions** in each run (fixed seed).
 |---|---|---|
 | T4 Colab | typed-decisions, MASSIVE (14 langs), XNLI (15 langs), English suites, latency, option-order robustness, calibration repair | `research/results/t4_colab_benchmark.json` |
 | CPU sweep | MASSIVE intent across **all 51 languages**; its typed-decisions part (`part_b`) covers the English checkpoint only | `research/results/cpu_51_language_sweep.json` |
-| Applications | the seven workflow themes + the datasets where Jev numbers exist, all three checkpoints (laya 0.2.1, CPU, 400 cases per task, seed 13, 2026-09-19) | `research/results/app_benchmark_results.json` |
+| Applications | the seven workflow themes + the datasets where Jev numbers exist, all three checkpoints (taut 0.2.1, CPU, 400 cases per task, seed 13, 2026-09-19) | `research/results/app_benchmark_results.json` |
 
 
 **Calibration columns in the CPU sweep predate the temperature clamp.** The 51-language ECE and mean-confidence figures were produced before #42 clamped temperatures to `[0.5, 5]`, so today's package reports different confidence for the affected buckets. Accuracy columns are unaffected, because a temperature-scaled softmax has the same argmax at every positive temperature.
@@ -27,7 +27,7 @@ The raw-temperature column reproduces the committed file, so the only variable l
 
 ## Headline
 
-| | Laya | Jev (published) |
+| | Taut | Jev (published) |
 |---|---|---|
 | typed-decisions (2,000 decisions) | **0.766** | 0.727 |
 | AG News (4 labels) | **0.953** | 0.910 |
@@ -41,7 +41,7 @@ The raw-temperature column reproduces the committed file, so the only variable l
 
 ### All 51 MASSIVE languages — intent, 20 options (random = 0.050)
 
-| | laya | laya-multilingual |
+| | taut | taut-multilingual |
 |---|---|---|
 | macro accuracy | 0.2269 | **0.3661** |
 | macro ECE *(lower better)* | 0.7331 | **0.3869** |
@@ -49,7 +49,7 @@ The raw-temperature column reproduces the committed file, so the only variable l
 
 <details><summary><b>Per language (51)</b> — sorted by how much routing gains</summary>
 
-| lang | laya | laya-multilingual | Δ | laya ECE | multilingual ECE |
+| lang | taut | taut-multilingual | Δ | taut ECE | multilingual ECE |
 |---|---|---|---|---|---|
 | `th` | 0.080 | 0.480 | +0.400 | 0.881 | 0.336 |
 | `ko` | 0.110 | 0.450 | +0.340 | 0.850 | 0.329 |
@@ -107,7 +107,7 @@ The raw-temperature column reproduces the committed file, so the only variable l
 
 ### English vs the rest
 
-| task | | laya | laya-multilingual |
+| task | | taut | taut-multilingual |
 |---|---|---|---|
 | MASSIVE intent — English | **0.783** | 0.657 |
 | MASSIVE intent — other languages | 0.306 | **0.451** |
@@ -122,9 +122,9 @@ The English checkpoint does not degrade gracefully outside English — it collap
 
 ## Themes — the application workflows
 
-Each is real labelled data, 400 cases, all three checkpoints. *held out* means the source was **not** in Laya's training mix.
+Each is real labelled data, 400 cases, all three checkpoints. *held out* means the source was **not** in Taut's training mix.
 
-| theme | laya | laya-multilingual | laya-typed-decisions | data |
+| theme | taut | taut-multilingual | taut-typed-decisions | data |
 |---|---|---|---|---|
 | Email spam | **0.993** | 0.993 | 0.958 | in training |
 | Phishing | 0.980 | **0.993** | 0.940 | in training |
@@ -140,7 +140,7 @@ Each is real labelled data, 400 cases, all three checkpoints. *held out* means t
 
 ### On the public datasets where Jev numbers exist
 
-| dataset | laya | laya-multilingual | laya-typed-decisions | Jev (published) |
+| dataset | taut | taut-multilingual | taut-typed-decisions | Jev (published) |
 |---|---|---|---|---|
 | AG News (4 labels) | 0.950 | 0.930 | **0.953** | 0.910 |
 | DAIR Emotion (6 labels) | 0.595 | 0.530 | **0.600** | 0.480 |
@@ -154,15 +154,15 @@ banking77 is the one clear loss, and it is architectural: a choice question's op
 
 | model | accuracy | soft acc | Brier | ECE | score MAE |
 |---|---|---|---|---|---|
-| `laya-typed-decisions` | **0.766** | 0.471 | 0.061 | 0.213 | 0.242 |
-| `laya` | 0.361 | 0.332 | 0.316 | 0.175 | 0.694 |
-| `laya-multilingual` | 0.342 | 0.326 | 0.439 | 0.285 | 0.687 |
+| `taut-typed-decisions` | **0.766** | 0.471 | 0.061 | 0.213 | 0.242 |
+| `taut` | 0.361 | 0.332 | 0.316 | 0.175 | 0.694 |
+| `taut-multilingual` | 0.342 | 0.326 | 0.439 | 0.285 | 0.687 |
 | *Jev 1.13.0 (published)* | *0.727* | *0.580* | *0.148* | *0.144* | *0.391* |
 | *teacher ceiling* | *0.735* | *—* | *—* | *—* | *—* |
 | *majority class* | *0.461* | *—* | *—* | *—* | *—* |
 | *random guess* | *0.318* | *—* | *—* | *—* | *—* |
 
-| workflow | laya-typed-decisions |
+| workflow | taut-typed-decisions |
 |---|---|
 | agent trace observability | 0.730 |
 | customer service | 0.764 |
@@ -175,23 +175,23 @@ banking77 is the one clear loss, and it is architectural: a choice question's op
 
 ## Speed (Tesla T4)
 
-| questions per call | laya | laya-multilingual |
+| questions per call | taut | taut-multilingual |
 |---|---|---|
 | 1 | 39.5 ms | **32.8 ms** |
 | 5 | 84.5 ms | **40.1 ms** |
 | 10 | 158.6 ms | **72.3 ms** |
 | 50 | 771.3 ms | **337.4 ms** |
 
-103–332 questions/sec batched. Jev independently measured at 236-276 ms p50, so Laya answers one question roughly **6–7× faster**.
+103–332 questions/sec batched. Jev independently measured at 236-276 ms p50, so Taut answers one question roughly **6–7× faster**.
 
 ### Calibration
 
 | | as shipped | temperature refit | 
 |---|---|---|
-| `laya` | 0.466 | **0.081** |
-| `laya-multilingual` | 0.314 | **0.106** |
+| `taut` | 0.466 | **0.081** |
+| `taut-multilingual` | 0.314 | **0.106** |
 
-Both ship over-confident; `laya-multilingual` ships with no fitted temperatures at all. Refitting one temperature per (question type, option count) on held-out data is the single highest-value fix available, and takes ECE below Jev's measured 0.246.
+Both ship over-confident; `taut-multilingual` ships with no fitted temperatures at all. Refitting one temperature per (question type, option count) on held-out data is the single highest-value fix available, and takes ECE below Jev's measured 0.246.
 
 ### From a calibration number to a contract
 
@@ -200,7 +200,7 @@ something an operations owner can budget against. It says the number is trustwor
 average; it does not say which threshold to run, what that threshold lets through, or what
 happens when the calibration set is too small to tell.
 
-`laya.conformal` converts it. Fit a gate on a labelled split at a risk budget and it
+`taut.conformal` converts it. Fit a gate on a labelled split at a risk budget and it
 returns a threshold carrying a distribution-free, finite-sample bound — and, crucially, it
 does so **without assuming the model is calibrated at all**. Calibration buys coverage
 here, not validity: a better-calibrated model clears the same guarantee while abstaining
@@ -230,7 +230,7 @@ Reproduce with `python research/conformal/validate_risk.py`.
 
 How often the answer changes when the options are permuted. Jev measured at 0.13.
 
-| suite | laya | laya-multilingual |
+| suite | taut | taut-multilingual |
 |---|---|---|
 | massive_intent.en | 0.150 | 0.230 |
 | en.emotion | 0.040 | 0.090 |
@@ -241,7 +241,7 @@ At 20 options both are less order-stable than Jev — worth fixing with more agg
 
 ## Other hardware: GB10 and a laptop CPU
 
-Contributed measurements from a router deployment (laya 0.3.5). They were taken through a small HTTP server wrapping `Agent.system_one`, not in-process, so every figure includes one HTTP round trip.
+Contributed measurements from a router deployment (taut 0.3.5). They were taken through a small HTTP server wrapping `Agent.system_one`, not in-process, so every figure includes one HTTP round trip.
 
 ### NVIDIA GB10 (DGX Spark, aarch64), CUDA
 
@@ -256,7 +256,7 @@ Contributed measurements from a router deployment (laya 0.3.5). They were taken 
 
 Each extra question costs about **7.0 ms**, half the T4's ~14.9 ms. But one question is **slower** than the T4's 39.5 ms, because roughly 93 ms per call is fixed overhead that the GPU does not remove. We have not isolated where that overhead goes. On a GB10, batching questions into one call is where the speedup is.
 
-On laya_router's 180 labelled requests (one tier question), accuracy on CUDA matched CPU to within one row per wording (0.700 vs 0.694, 0.656 vs 0.656, 0.611 vs 0.606). That is backend floating-point noise, not a change in behaviour.
+On taut_router's 180 labelled requests (one tier question), accuracy on CUDA matched CPU to within one row per wording (0.700 vs 0.694, 0.656 vs 0.656, 0.611 vs 0.606). That is backend floating-point noise, not a change in behaviour.
 
 Setup note for aarch64 without root: Triton JIT-compiles a CUDA shim with `gcc` on the first CUDA call, which fails with `Python.h: No such file or directory` if `python3-dev` is absent. Fetch the headers with `apt-get download libpython3.12-dev python3.12-dev`, unpack with `dpkg-deb -x` into a directory, and set `CPATH` to both `usr/include` and `usr/include/python3.12` under it.
 
@@ -277,7 +277,7 @@ The best setting is the physical core count plus a little, not one thread per vC
 
 ### Calibration on a routing task runs the other way
 
-On laya_router's 180 requests (zero-shot, one 3-tier `choice`), nearly every configuration we measured was **under**-confident (the few exceptions were +0.01 to +0.06, and among the least accurate). Mean P(chosen) (the chosen option's probability, not the entropy-based `confidence` field) sat below accuracy, by −0.18 on the root checkpoint with example-led tier descriptions (0.562 vs 0.744) and by −0.19 on `typed-decisions` (0.501 vs 0.694). This is one task and one set of labels, so it does not contradict the over-confidence reported above. It does mean the direction of the miscalibration depends on the task, and a temperature fit on your own data is the right fix either way.
+On taut_router's 180 requests (zero-shot, one 3-tier `choice`), nearly every configuration we measured was **under**-confident (the few exceptions were +0.01 to +0.06, and among the least accurate). Mean P(chosen) (the chosen option's probability, not the entropy-based `confidence` field) sat below accuracy, by −0.18 on the root checkpoint with example-led tier descriptions (0.562 vs 0.744) and by −0.19 on `typed-decisions` (0.501 vs 0.694). This is one task and one set of labels, so it does not contradict the over-confidence reported above. It does mean the direction of the miscalibration depends on the task, and a temperature fit on your own data is the right fix either way.
 
 ---
 
@@ -288,7 +288,7 @@ On laya_router's 180 requests (zero-shot, one 3-tier `choice`), nearly every con
 - **Keep `choice` questions under ~20 options.**
 - **Both checkpoints ship over-confident.** Fit temperatures on your own data.
 - **Ordinal `score` is the weakest primitive** (SST-5 0.372).
-- `laya` collapses outside English; `laya-multilingual` is weaker on English. Route.
+- `taut` collapses outside English; `taut-multilingual` is weaker on English. Route.
 - **A conformal gate needs exchangeability, and drift breaks it.** The bound holds for any
   distribution, but only if calibration and serving traffic are drawn from the *same* one.
   A gate fitted on last quarter's tickets carries no guarantee on this quarter's if the mix
@@ -302,7 +302,7 @@ On laya_router's 180 requests (zero-shot, one 3-tier `choice`), nearly every con
 
 ## GPU fast path
 
-`pip install laya[fast]` + `laya.load(..., fast=True)` replaces the encoder/head forward with fused
+`pip install taut[fast]` + `taut.load(..., fast=True)` replaces the encoder/head forward with fused
 [TileLang](https://github.com/tile-ai/tilelang) kernels (GEMM+epilogue, GEMM+GEGLU, residual+LayerNorm,
 in-place RoPE, sliding-window flash attention over the packed QKV buffer), bf16-resident weights and one
 CUDA graph per (batch, length) bucket. Measured with `benchmarks/bench_fast.py --eval 1000` on an
@@ -317,12 +317,12 @@ can be re-checked without a GPU.
 
 | checkpoint | type | n | max \|p_fast - p_stock\| | max \|p_fast - p_fp32\| | max \|p_stock - p_fp32\| | argmax fast = stock | fast = fp32 |
 |---|---|---|---|---|---|---|---|
-| laya | choice | 48 | 0.031 | **0.022** | 0.024 | 47/48 | 47/48 |
-| laya | noul | 180 | 0.076 | **0.044** | 0.058 | 180/180 | 180/180 |
-| laya | score | 60 | 0.015 | **0.011** | 0.017 | 59/60 | 60/60 |
-| laya-multilingual | choice | 48 | 0.049 | **0.015** | 0.039 | 47/48 | 47/48 |
-| laya-multilingual | noul | 180 | 0.037 | 0.046 | 0.045 | 180/180 | 179/180 |
-| laya-multilingual | score | 60 | 0.010 | **0.009** | 0.009 | 59/60 | 59/60 |
+| taut | choice | 48 | 0.031 | **0.022** | 0.024 | 47/48 | 47/48 |
+| taut | noul | 180 | 0.076 | **0.044** | 0.058 | 180/180 | 180/180 |
+| taut | score | 60 | 0.015 | **0.011** | 0.017 | 59/60 | 60/60 |
+| taut-multilingual | choice | 48 | 0.049 | **0.015** | 0.039 | 47/48 | 47/48 |
+| taut-multilingual | noul | 180 | 0.037 | 0.046 | 0.045 | 180/180 | 179/180 |
+| taut-multilingual | score | 60 | 0.010 | **0.009** | 0.009 | 59/60 | 59/60 |
 
 The fast path is at least as close to the fp32 reference as the stock bf16 path is (the residual stream stays in fp32 in
 both), and the two bf16 paths differ from each other only by bf16 accumulation order; the few argmax disagreements are
@@ -333,15 +333,15 @@ emotion, 1,000 samples each) are identical within noise; see `benchmarks/bench_f
 
 | checkpoint | case | stock | fast | speedup |
 |---|---|---|---|---|
-| laya (ModernBERT-large) | 1 question, 72 tok | 17.7 | 4.6 | **3.8×** |
+| taut (ModernBERT-large) | 1 question, 72 tok | 17.7 | 4.6 | **3.8×** |
 | | 3 questions, 72 tok | 18.9 | 6.6 | 2.9× |
 | | 30 questions, 72 tok | 43.2 | 35.7 | 1.2× |
 | | 30 questions, 512 tok | 327.5 | 232.1 | 1.4× |
-| laya-multilingual (mmBERT-base) | 1 question, 72 tok | 14.1 | 2.8 | **5.1×** |
+| taut-multilingual (mmBERT-base) | 1 question, 72 tok | 14.1 | 2.8 | **5.1×** |
 | | 3 questions, 72 tok | 15.0 | 3.9 | 3.9× |
 | | 30 questions, 72 tok | 22.2 | 17.8 | 1.2× |
 | | 30 questions, 966 tok | 320.7 | 187.6 | 1.7× |
-| laya-multilingual, AG News eval loop | 1 question / sample | 14.9 | 3.2 | 4.7× |
+| taut-multilingual, AG News eval loop | 1 question / sample | 14.9 | 3.2 | 4.7× |
 
 Small requests are launch-overhead bound in the stock path (≈200 kernels from Python per call); the CUDA
 graph removes that. Large batches are GEMM bound; the fused kernels sit at ~80 TFLOPS there, on par with

@@ -12,8 +12,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from laya.conformal import ConformalGate  # noqa: E402
-from laya.drift import (  # noqa: E402
+from taut.conformal import ConformalGate  # noqa: E402
+from taut.drift import (  # noqa: E402
     GateMonitor,
     binomial_two_sided_p,
     ks_p_value,
@@ -98,6 +98,28 @@ check("ks/no observations is not evidence", ks_two_sample([], sketch)["p_value"]
 check("ks/no reference is not evidence",
       ks_two_sample([0.5], {"n": 0, "levels": [0.0], "quantiles": [0.0]})["p_value"], 1.0)
 
+
+# Heavy ties are the normal case, not an edge case: a confident decision model returns
+# p=1.000 over and over. Reconstructing a continuous reference CDF and checking both edges
+# of each empirical step reported 0.40 here -- a sample against its own sketch -- which made
+# the monitor call every confident deployment "expired".
+from taut.conformal import _sketch  # noqa: E402
+
+tied = np.repeat([1.0, 0.612, 0.580, 0.996, 1.0], 40)
+tied_ks = ks_two_sample(tied, _sketch(tied))
+ok("ks/a tied sample does not drift from its own sketch", tied_ks["statistic"] < 0.01,
+   "statistic=%.4f" % tied_ks["statistic"])
+ok("ks/and is not significant", tied_ks["p_value"] > 0.5, "p=%.3g" % tied_ks["p_value"])
+
+one_atom = np.full(300, 1.0)
+atom_ks = ks_two_sample(one_atom, _sketch(one_atom))
+check("ks/a single-atom distribution is exactly zero", atom_ks["statistic"], 0.0)
+
+cont = np.random.default_rng(4).beta(5, 2, 2000)
+ok("ks/a continuous sample does not drift from its own sketch",
+   ks_two_sample(cont, _sketch(cont))["statistic"] < 0.02)
+ok("ks/ties still detect a real shift",
+   ks_two_sample(np.repeat([0.3, 0.35], 200), _sketch(tied))["p_value"] < 1e-6)
 
 # ------------------------------------------------------------------ a fitted gate
 KEYS = ["a", "b", "c", "d"]
@@ -277,7 +299,7 @@ check("legacy/it does not fail closed", lres["status"], "ok")
 
 # ------------------------------------------------------------------ the report
 rep = watch(1.0, 902).report()
-ok("report/leads with the status", rep.startswith("Laya gate drift  status=expired"))
+ok("report/leads with the status", rep.startswith("Taut gate drift  status=expired"))
 ok("report/names the question", "q " in rep)
 ok("report/shows both tests", "KS=" in rep and "%" in rep)
 ok("report/says what to do", "Refit on freshly labelled traffic" in rep)
@@ -289,10 +311,10 @@ ok("report/a clean run does not tell anyone to refit",
    "Refit on freshly labelled traffic" not in clean)
 
 # ------------------------------------------------------------------ package surface
-import laya  # noqa: E402
+import taut  # noqa: E402
 
-ok("export/GateMonitor is in __all__", "GateMonitor" in laya.__all__)
-check("export/GateMonitor resolves", laya.GateMonitor, GateMonitor)
+ok("export/GateMonitor is in __all__", "GateMonitor" in taut.__all__)
+check("export/GateMonitor resolves", taut.GateMonitor, GateMonitor)
 
 import subprocess  # noqa: E402
 
@@ -305,8 +327,8 @@ class Blocker:
             raise ImportError("torch blocked")
         return None
 sys.meta_path.insert(0, Blocker())
-import laya
-laya.GateMonitor
+import taut
+taut.GateMonitor
 assert "torch" not in sys.modules, "drift monitoring pulled in torch"
 print("ok")
 ''' % os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -65,18 +65,18 @@ for field in ("python_requires", "install_requires", "classifiers"):
         "metadata belongs in pyproject.toml only",
     )
 
-# The release job checks the git tag against pyproject, but laya.__version__ is what the server
+# The release job checks the git tag against pyproject, but taut.__version__ is what the server
 # and SDK report at runtime, so the two strings must not drift apart.
 static_version = re.search(r'^version\s*=\s*"([^"]+)"', pyproject, re.M)
 check_true("pyproject/declares a static version", static_version is not None)
-init_version = re.search(r'^__version__\s*=\s*"([^"]+)"', read(os.path.join("laya", "__init__.py")), re.M)
-check_true("laya/__init__ declares a literal __version__", init_version is not None)
+init_version = re.search(r'^__version__\s*=\s*"([^"]+)"', read(os.path.join("taut", "__init__.py")), re.M)
+check_true("taut/__init__ declares a literal __version__", init_version is not None)
 check(
-    "version/pyproject matches laya.__version__",
+    "version/pyproject matches taut.__version__",
     static_version.group(1) if static_version else None,
     init_version.group(1) if init_version else None,
 )
-for label, match in (("pyproject", static_version), ("laya/__init__", init_version)):
+for label, match in (("pyproject", static_version), ("taut/__init__", init_version)):
     value = match.group(1) if match else ""
     parts = value.split(".")
     check_true("%s/version is X.Y.Z" % label, len(parts) == 3 and all(p.isdigit() for p in parts), "got %r" % value)
@@ -155,9 +155,9 @@ base = read("compose.yaml")
 cuda = read("compose.cuda.yaml")
 dockerfile = read("Dockerfile")
 
-check_true("compose.http/declares laya-serve", "laya-serve:" in http, http[:200])
+check_true("compose.http/declares taut-serve", "taut-serve:" in http, http[:200])
 check_true("compose.http/runs the server command",
-           'command: ["laya-serve"]' in http, "laya-serve is not the container command")
+           'command: ["taut-serve"]' in http, "taut-serve is not the container command")
 check_true("compose.http/publishes a port", re.search(r"^\s*ports:", http, re.M) is not None)
 # Host and container port must come from the same variable, or they drift apart and the
 # published port stops reaching the server.
@@ -167,25 +167,25 @@ if port_map:
     check("compose.http/host port equals container port", port_map.group(2), port_map.group(4))
     check("compose.http/both sides use the same variable", port_map.group(1), port_map.group(3))
 check_true("compose.http/the server reads the same variable",
-           'LAYA_PORT: "${LAYA_PORT:-8000}"' in http)
+           'TAUT_PORT: "${TAUT_PORT:-8000}"' in http)
 check_true("compose.http/shares the model cache",
-           "model-cache:/home/laya/.cache/huggingface" in http)
-# The base service is what `docker compose run --rm laya` uses; publishing it a port or
+           "model-cache:/home/taut/.cache/huggingface" in http)
+# The base service is what `docker compose run --rm taut` uses; publishing it a port or
 # changing its command would be a breaking change to the quickstart.
 check_true("compose.http/leaves the quickstart service alone",
-           "laya:" not in http, "compose.http.yaml overrides the base `laya` service")
+           "taut:" not in http, "compose.http.yaml overrides the base `taut` service")
 
-# `pip install .` alone puts no `laya-serve` in the image, so the extra is load-bearing.
+# `pip install .` alone puts no `taut-serve` in the image, so the extra is load-bearing.
 check_true("Dockerfile/installs the serve extra", '".[serve]"' in dockerfile, dockerfile[:400])
 check_true("Dockerfile/still runs pip check", "pip check" in dockerfile)
 
 # A Compose override replaces a service's `build` block whole. If the CUDA override does
-# not repeat the args for laya-serve, that service silently serves on CPU.
-check_true("compose.cuda/covers laya-serve too",
-           re.search(r"^\s{2}laya-serve:", cuda, re.M) is not None,
-           "compose.cuda.yaml does not mention laya-serve, so GPU serving would be CPU")
+# not repeat the args for taut-serve, that service silently serves on CPU.
+check_true("compose.cuda/covers taut-serve too",
+           re.search(r"^\s{2}taut-serve:", cuda, re.M) is not None,
+           "compose.cuda.yaml does not mention taut-serve, so GPU serving would be CPU")
 check("compose.cuda/repeats the torch index for the base service",
-      len(re.findall(r'TORCH_INDEX: "\$\{LAYA_TORCH_INDEX:-cu128\}"', cuda)), 2)
+      len(re.findall(r'TORCH_INDEX: "\$\{TAUT_TORCH_INDEX:-cu128\}"', cuda)), 2)
 check("compose.cuda/repeats the device reservation for both services",
       len(re.findall(r"driver: nvidia", cuda)), 2)
 check_true("compose.cuda/no stale reference to a missing file",

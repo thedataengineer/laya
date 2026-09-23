@@ -12,15 +12,15 @@ RUN pip install torch --index-url https://download.pytorch.org/whl/${TORCH_INDEX
 
 WORKDIR /src
 COPY pyproject.toml setup.py README.md LICENSE ./
-COPY laya/ ./laya/
-# The `serve` extra puts `laya-serve` (POST /v1/systemone, GET /health) in the image, so
+COPY taut/ ./taut/
+# The `serve` extra puts `taut-serve` (POST /v1/systemone, GET /health) in the image, so
 # the same image can run a one-shot request or serve the Jev-compatible API. It adds
 # fastapi and uvicorn only; torch was installed above.
 RUN pip install ".[serve]" && pip check
 
 FROM python:3.11-slim-bookworm AS runtime
 
-LABEL org.opencontainers.image.title="Laya Docker quickstart" \
+LABEL org.opencontainers.image.title="Taut Docker quickstart" \
       org.opencontainers.image.source="https://github.com/NandhaKishorM/laya" \
       org.opencontainers.image.licenses="Apache-2.0"
 
@@ -31,20 +31,20 @@ ENV PATH="/opt/venv/bin:$PATH" \
     USE_TORCH=1 \
     TOKENIZERS_PARALLELISM=false \
     OMP_NUM_THREADS=4 \
-    LAYA_DEVICE=cpu \
-    HF_HOME=/home/laya/.cache/huggingface
+    TAUT_DEVICE=cpu \
+    HF_HOME=/home/taut/.cache/huggingface
 
-RUN groupadd --gid 10001 laya \
-    && useradd --uid 10001 --gid laya --create-home laya \
-    && mkdir -p /home/laya/.cache/huggingface \
-    && chown -R laya:laya /home/laya/.cache
+RUN groupadd --gid 10001 taut \
+    && useradd --uid 10001 --gid taut --create-home taut \
+    && mkdir -p /home/taut/.cache/huggingface \
+    && chown -R taut:taut /home/taut/.cache
 
 COPY --from=build /opt/venv /opt/venv
-COPY LICENSE /usr/share/doc/laya/LICENSE
-COPY examples/docker/ /opt/laya/examples/
-COPY docker/entrypoint.py /opt/laya/entrypoint.py
-USER laya
-WORKDIR /home/laya
+COPY LICENSE /usr/share/doc/taut/LICENSE
+COPY examples/docker/ /opt/taut/examples/
+COPY docker/entrypoint.py /opt/taut/entrypoint.py
+USER taut
+WORKDIR /home/taut
 
-ENTRYPOINT ["python", "/opt/laya/entrypoint.py"]
-CMD ["python", "/opt/laya/examples/quickstart.py"]
+ENTRYPOINT ["python", "/opt/taut/entrypoint.py"]
+CMD ["python", "/opt/taut/examples/quickstart.py"]

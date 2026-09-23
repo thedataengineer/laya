@@ -24,14 +24,14 @@ from tokenizers import Tokenizer  # noqa: E402
 from tokenizers.models import WordLevel  # noqa: E402
 from transformers import BertConfig, BertModel, PreTrainedTokenizerFast  # noqa: E402
 
-from laya import load  # noqa: E402
-from laya.common import DecisionModel, QTYPES  # noqa: E402
+from taut import load  # noqa: E402
+from taut.common import DecisionModel, QTYPES  # noqa: E402
 
 
 def export_notebook_config(cfg, fitted_temps, output_dir):
     """Execute the notebook's actual config export, without its GPU/training code."""
     notebook = Path(__file__).resolve().parents[1] / "notebooks" / (
-        "laya_finetune_typed_decisions_2xT4_kaggle.ipynb"
+        "taut_finetune_typed_decisions_2xT4_kaggle.ipynb"
     )
     cells = json.loads(notebook.read_text(encoding="utf-8"))["cells"]
     script, = ["".join(c["source"]) for c in cells
@@ -122,7 +122,7 @@ class CalibrationPersistenceTests(unittest.TestCase):
         self.assertFalse(saved.get("temperature_by_options"))
         self.assertEqual(saved["temperature"], self.fitted)
         self.assertTrue(saved["fine_tuned"])
-        self.assertEqual(saved["model_name"], "laya-typed-decisions")
+        self.assertEqual(saved["model_name"], "taut-typed-decisions")
         for key in original.keys() - {"temperature", "temperature_by_options"}:
             self.assertEqual(saved[key], original[key])
 

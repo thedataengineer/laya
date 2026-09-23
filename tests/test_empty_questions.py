@@ -19,8 +19,8 @@ from tokenizers import Tokenizer  # noqa: E402
 from tokenizers.models import WordLevel  # noqa: E402
 from transformers import BertConfig, BertModel, PreTrainedTokenizerFast  # noqa: E402
 
-from laya.agent import Agent  # noqa: E402
-from laya.common import DecisionModel  # noqa: E402
+from taut.agent import Agent  # noqa: E402
+from taut.common import DecisionModel  # noqa: E402
 
 
 class EmptyQuestionsTests(unittest.TestCase):
@@ -42,7 +42,7 @@ class EmptyQuestionsTests(unittest.TestCase):
         config = BertConfig(vocab_size=6, hidden_size=16, num_hidden_layers=1,
                             num_attention_heads=1, intermediate_size=32)
         self.agent.model = DecisionModel(BertModel(config), head_layers=0).eval()
-        self.empty = {"model": "laya-rl-agent", "answers": {},
+        self.empty = {"model": "taut-rl-agent", "answers": {},
                       "usage": {"input_tokens": 0, "output_tokens": 0}}
 
     def test_both_methods_return_empty_response_for_supported_states(self):
@@ -59,8 +59,8 @@ class EmptyQuestionsTests(unittest.TestCase):
     def test_empty_questions_skip_tokenization_batching_and_forward(self):
         self.agent.tok = Mock(side_effect=AssertionError("unexpected tokenization"))
         self.agent.model = Mock(side_effect=AssertionError("unexpected forward pass"))
-        with patch("laya.agent.build_sequence", side_effect=AssertionError("unexpected encoding")) as encode, \
-                patch("laya.agent.collate_items", side_effect=AssertionError("unexpected batching")) as collate:
+        with patch("taut.agent.build_sequence", side_effect=AssertionError("unexpected encoding")) as encode, \
+                patch("taut.agent.collate_items", side_effect=AssertionError("unexpected batching")) as collate:
             self.assertEqual(self.agent.predict("hello", {}), self.empty)
             self.assertEqual(self.agent.system_one("hello", {}), self.empty)
         encode.assert_not_called()
@@ -88,7 +88,7 @@ class EmptyQuestionsTests(unittest.TestCase):
         self.assertEqual(forward.call_count, 2)
         self.assertEqual(before, after)
         self.assertEqual(questions, original)
-        self.assertEqual(before["model"], "laya-rl-agent")
+        self.assertEqual(before["model"], "taut-rl-agent")
         self.assertGreater(before["usage"]["input_tokens"], 0)
         self.assertEqual(before["usage"]["output_tokens"], 0)
         answers = before["answers"]

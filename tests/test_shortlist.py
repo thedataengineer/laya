@@ -11,10 +11,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np  # noqa: E402
 
-import laya  # noqa: E402
-from laya.agent import Agent  # noqa: E402
-from laya.common import DecisionModel, render_options  # noqa: E402
-from laya.shortlist import (  # noqa: E402
+import taut  # noqa: E402
+from taut.agent import Agent  # noqa: E402
+from taut.common import DecisionModel, render_options  # noqa: E402
+from taut.shortlist import (  # noqa: E402
     embed_fn_from_agent,
     predict_shortlist,
     shortlist_choice,
@@ -120,11 +120,11 @@ def _embed_for(query_text, option_vectors):
 
 
 # ---------------------------------------------------------------- exports and default path
-check_true("export/shortlist_choice", laya.shortlist_choice is shortlist_choice)
-check_true("export/predict_shortlist", laya.predict_shortlist is predict_shortlist)
-check_true("export/embed_fn_from_agent", laya.embed_fn_from_agent is embed_fn_from_agent)
+check_true("export/shortlist_choice", taut.shortlist_choice is shortlist_choice)
+check_true("export/predict_shortlist", taut.predict_shortlist is predict_shortlist)
+check_true("export/embed_fn_from_agent", taut.embed_fn_from_agent is embed_fn_from_agent)
 for _name in ("shortlist_choice", "predict_shortlist", "embed_fn_from_agent"):
-    check_true("all/%s" % _name, _name in laya.__all__)
+    check_true("all/%s" % _name, _name in taut.__all__)
 
 _predict_src = inspect.getsource(Agent.system_one)
 check_true("default/predict is system_one", Agent.predict is Agent.system_one)

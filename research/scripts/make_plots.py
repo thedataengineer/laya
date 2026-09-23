@@ -3,7 +3,7 @@
   USE_TF=0 python3 research/scripts/make_plots.py
 
 Reads the published results in research/results/ (the 51-language sweep and the T4 run)
-and writes assets/laya_benchmark.png.
+and writes assets/taut_benchmark.png.
 """
 import json
 import os
@@ -58,9 +58,9 @@ def main():
     e = np.array([en[l]["accuracy"] for l in langs])
     m = np.array([ml[l]["accuracy"] for l in langs])
     axA.hlines(y, e, m, color=GRID, lw=2.4, zorder=1)
-    axA.scatter(e, y, s=62, color=BLUE, zorder=3, label="laya (English checkpoint)",
+    axA.scatter(e, y, s=62, color=BLUE, zorder=3, label="taut (English checkpoint)",
                 edgecolors=SURFACE, linewidths=1.6)
-    axA.scatter(m, y, s=62, color=ORANGE, zorder=3, label="laya-multilingual",
+    axA.scatter(m, y, s=62, color=ORANGE, zorder=3, label="taut-multilingual",
                 edgecolors=SURFACE, linewidths=1.6)
     axA.axvline(0.05, color=INK3, lw=1.4, ls=(0, (4, 3)), zorder=2)
     axA.text(0.052, len(langs) - 0.4, "random guess (0.050)", color=INK3, fontsize=9, va="top")
@@ -79,11 +79,11 @@ def main():
     lat = col["latency"]
     ns = ["1_questions", "5_questions", "10_questions", "50_questions"]
     lab = ["1", "5", "10", "50"]
-    a = [lat["laya"][n]["p50_ms"] for n in ns]
-    b = [lat["laya-multilingual"][n]["p50_ms"] for n in ns]
+    a = [lat["taut"][n]["p50_ms"] for n in ns]
+    b = [lat["taut-multilingual"][n]["p50_ms"] for n in ns]
     x = np.arange(len(ns)); w = 0.36
-    axB.bar(x - w / 2 - 0.01, a, w, color=BLUE, label="laya", zorder=3)
-    axB.bar(x + w / 2 + 0.01, b, w, color=ORANGE, label="laya-multilingual", zorder=3)
+    axB.bar(x - w / 2 - 0.01, a, w, color=BLUE, label="taut", zorder=3)
+    axB.bar(x + w / 2 + 0.01, b, w, color=ORANGE, label="taut-multilingual", zorder=3)
     for xi, v in zip(x - w / 2 - 0.01, a):
         axB.text(xi, v + 18, "%.0f" % v, ha="center", fontsize=9, color=INK2)
     for xi, v in zip(x + w / 2 + 0.01, b):
@@ -102,11 +102,11 @@ def main():
     axC = fig.add_subplot(gs[1, 1])
     names = ["AG News\n(4 labels)", "DAIR Emotion\n(6 labels)", "typed-decisions\n(2,000 dec.)"]
     jev = [0.910, 0.480, 0.727]
-    lay = [col["suites"]["en.ag_news"]["laya"]["calibrated"]["accuracy"],
-           col["suites"]["en.emotion"]["laya"]["calibrated"]["accuracy"], 0.766]
+    lay = [col["suites"]["en.ag_news"]["taut"]["calibrated"]["accuracy"],
+           col["suites"]["en.emotion"]["taut"]["calibrated"]["accuracy"], 0.766]
     x = np.arange(3)
     axC.bar(x - w / 2 - 0.01, jev, w, color=INK3, label="Jev (published)", zorder=3)
-    axC.bar(x + w / 2 + 0.01, lay, w, color=BLUE, label="Laya (measured)", zorder=3)
+    axC.bar(x + w / 2 + 0.01, lay, w, color=BLUE, label="Taut (measured)", zorder=3)
     for xi, v in zip(x - w / 2 - 0.01, jev):
         axC.text(xi, v + .02, "%.3f" % v, ha="center", fontsize=9, color=INK2)
     for xi, v in zip(x + w / 2 + 0.01, lay):
@@ -124,7 +124,7 @@ def main():
     # ---------------------------------------------------------------- D. calibration
     axD = fig.add_subplot(gs[2, 1])
     rep = col["calibration_repair"]
-    models = ["laya", "laya-multilingual"]
+    models = ["taut", "taut-multilingual"]
     ship = [rep[m]["mean_ece_shipped"] for m in models]
     refit = [rep[m]["mean_ece_refit"] for m in models]
     x = np.arange(2)
@@ -144,9 +144,9 @@ def main():
     axD.yaxis.grid(True, color=GRID, lw=0.9); axD.set_axisbelow(True)
     strip(axD); axD.legend(frameon=False, fontsize=9.5, loc="upper right", labelcolor=INK2)
 
-    fig.suptitle("Laya benchmark  ·  three checkpoints, identical questions, one T4",
+    fig.suptitle("Taut benchmark  ·  three checkpoints, identical questions, one T4",
                  fontsize=16, fontweight="bold", color=INK, x=0.012, ha="left", y=0.985)
-    out = os.path.join(ASSETS, "laya_benchmark.png")
+    out = os.path.join(ASSETS, "taut_benchmark.png")
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print("wrote", out, "(%.0f KB)" % (os.path.getsize(out) / 1024))
 

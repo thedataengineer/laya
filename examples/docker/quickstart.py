@@ -5,23 +5,23 @@ from pathlib import Path
 
 import torch
 
-from laya import Router, load
+from taut import Router, load
 
 
 def main():
-    device = os.environ.get("LAYA_DEVICE", "cpu")
+    device = os.environ.get("TAUT_DEVICE", "cpu")
     if torch.device(device).type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError(
             "CUDA was requested but is unavailable. "
             "Check the GPU override, host driver and NVIDIA Container Toolkit."
         )
-    request_file = os.environ.get("LAYA_REQUEST_FILE") or Path(__file__).with_name("request.json")
+    request_file = os.environ.get("TAUT_REQUEST_FILE") or Path(__file__).with_name("request.json")
     request = json.loads(Path(request_file).read_text(encoding="utf-8"))
-    model_path = os.environ.get("LAYA_MODEL_PATH")
-    model = os.environ.get("LAYA_MODEL", "auto") or "auto"
+    model_path = os.environ.get("TAUT_MODEL_PATH")
+    model = os.environ.get("TAUT_MODEL", "auto") or "auto"
     if model_path:
         if model != "auto":
-            raise ValueError("Set either LAYA_MODEL or LAYA_MODEL_PATH, not both")
+            raise ValueError("Set either TAUT_MODEL or TAUT_MODEL_PATH, not both")
         result = load(model_path, device=device).predict(request["state"], request["questions"])
     else:
         result = Router(device=device).predict(

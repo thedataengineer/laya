@@ -1,0 +1,27 @@
+Taut
+Copyright 2026 Karteek Yadavilli
+
+This product includes software developed as part of the Laya project
+(https://github.com/NandhaKishorM/laya), Copyright Convai Innovations,
+licensed under the Apache License, Version 2.0.
+
+Taut is a fork of Laya. The following are upstream's work and are used unmodified
+or near-unmodified under that licence:
+
+  * the decision-model architecture and the RLCD training recipe
+  * the published checkpoints, mirrored at https://huggingface.co/thekarteek/taut*
+    without retraining, quantisation or configuration changes
+  * the multi-checkpoint router, language detection and e-mail cleaning
+  * the TypeScript client and the benchmark harnesses
+
+The following are original to this fork:
+
+  * taut/conformal.py   -- distribution-free risk control over the decisions
+  * taut/drift.py       -- label-free detection of a gate that has stopped applying
+  * research/conformal/ -- the validation that the risk bound holds
+  * the gate surface in taut/serve.py and taut/cli.py
+
+Benchmark numbers reported in BENCHMARKS.md were measured on upstream's checkpoints.
+The sealed benchmark archive under research/benchmarks/feishu_zh/ retains upstream's
+naming by design: it is a published record with a sha256 integrity manifest, and
+renaming it would falsify that record.

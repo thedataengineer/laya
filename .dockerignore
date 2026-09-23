@@ -8,8 +8,8 @@
 !LICENSE
 !docker/
 !docker/entrypoint.py
-!laya/
-!laya/**
+!taut/
+!taut/**
 !examples/
 !examples/docker/
 !examples/docker/quickstart.py

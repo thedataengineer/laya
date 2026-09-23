@@ -1,7 +1,7 @@
 """The load-time and budget errors a user actually hits.
 
 Every branch here was reachable but never executed by any suite in CI, measured with
-`sys.settrace` over all 15 of them: `laya/agent.py` lines 126, 146, 154, 165 and 350 had
+`sys.settrace` over all 15 of them: `taut/agent.py` lines 126, 146, 154, 165 and 350 had
 zero hits. They are the messages a user sees when a checkpoint is wrong or a question is
 too large, so a regression in one is a regression in the only diagnostic they get.
 
@@ -28,8 +28,8 @@ from tokenizers.models import WordLevel  # noqa: E402
 from tokenizers.pre_tokenizers import Whitespace  # noqa: E402
 from transformers import BertConfig, BertModel, PreTrainedTokenizerFast  # noqa: E402
 
-from laya import load  # noqa: E402
-from laya.common import DecisionModel  # noqa: E402
+from taut import load  # noqa: E402
+from taut.common import DecisionModel  # noqa: E402
 
 PASS, FAIL = [], []
 
@@ -53,7 +53,7 @@ REPO = Path(TMP.name) / "repo"
 
 
 def build_checkpoint(root, max_len=64, head_max_len=32, vocab=("hello",)):
-    """A loadable Laya checkpoint, small enough to build in-process."""
+    """A loadable Taut checkpoint, small enough to build in-process."""
     words = {"[PAD]": 0, "[UNK]": 1, "[CLS]": 2, "[SEP]": 3, "[MASK]": 4}
     for i, word in enumerate(vocab):
         words[word] = 5 + i
@@ -124,7 +124,7 @@ check_true("present subfolder/loads", load_error(sub, subfolder="multilingual") 
 
 
 # --------------------------------------------------- 3. missing rl_agent_config.json
-# This is the file that makes a directory a Laya checkpoint rather than a bare encoder,
+# This is the file that makes a directory a Taut checkpoint rather than a bare encoder,
 # so the message has to point at the training run that would have written it.
 no_cfg = Path(TMP.name) / "no-config"
 shutil.copytree(REPO, no_cfg)

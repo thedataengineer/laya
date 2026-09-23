@@ -8,7 +8,7 @@ import pytest
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from laya.serve import _apply_thread_limit, _env_bool, _resolve_model, create_app  # noqa: E402
+from taut.serve import _apply_thread_limit, _env_bool, _resolve_model, create_app  # noqa: E402
 
 
 class FakeRouter:
@@ -22,7 +22,7 @@ class FakeRouter:
     def predict(self, state, questions, model=None):
         self.calls.append({"state": state, "questions": questions, "model": model})
         return {
-            "model": "laya-rl-agent",
+            "model": "taut-rl-agent",
             "answers": {
                 "dept": {"type": "choice", "choice": "billing",
                          "probabilities": {"billing": 0.94, "tech": 0.06}, "confidence": 0.94},
@@ -34,15 +34,15 @@ class FakeRouter:
 
 def _client(monkeypatch, api_key=None):
     if api_key is None:
-        monkeypatch.delenv("LAYA_API_KEY", raising=False)
+        monkeypatch.delenv("TAUT_API_KEY", raising=False)
     else:
-        monkeypatch.setenv("LAYA_API_KEY", api_key)
+        monkeypatch.setenv("TAUT_API_KEY", api_key)
     fake = FakeRouter()
     return TestClient(create_app(router=fake)), fake
 
 
 REQ = {
-    "model": "jev-1",  # a non-Laya model id -> should be ignored, router auto-routes
+    "model": "jev-1",  # a non-Taut model id -> should be ignored, router auto-routes
     "state": {"body": "billed twice, refund please"},
     "questions": {"dept": {"type": "choice", "instructions": "which team?",
                            "criteria": {"billing": None, "tech": None}}},
@@ -69,8 +69,8 @@ def test_known_model_is_honoured(monkeypatch):
 
 
 @pytest.mark.parametrize(("model", "expected"), [
-    ("convaiinnovations/laya-multilingual", "multilingual"),
-    ("convaiinnovations/laya-typed-decisions", "typed-decisions"),
+    ("thekarteek/taut-multilingual", "multilingual"),
+    ("thekarteek/taut-typed-decisions", "typed-decisions"),
 ])
 def test_published_model_id_is_honoured(monkeypatch, model, expected):
     client, fake = _client(monkeypatch)
@@ -99,9 +99,9 @@ def test_health(monkeypatch):
 
 def test_helpers():
     assert _resolve_model("multilingual") == "multilingual"
-    assert _resolve_model("convaiinnovations/laya-multilingual") == "multilingual"
-    assert _resolve_model("convaiinnovations/laya-typed-decisions") == "typed-decisions"
-    assert _resolve_model("convaiinnovations/laya") is None
+    assert _resolve_model("thekarteek/taut-multilingual") == "multilingual"
+    assert _resolve_model("thekarteek/taut-typed-decisions") == "typed-decisions"
+    assert _resolve_model("thekarteek/taut") is None
     assert _resolve_model("jev-1") is None
     assert _resolve_model(None) is None
     import os
@@ -110,12 +110,12 @@ def test_helpers():
 
 
 def test_thread_limit(monkeypatch):
-    monkeypatch.delenv("LAYA_THREADS", raising=False)
+    monkeypatch.delenv("TAUT_THREADS", raising=False)
     assert _apply_thread_limit() is None  # unset -> no-op, no torch import
     for bad in ("0", "-4", "abc", ""):
-        monkeypatch.setenv("LAYA_THREADS", bad)
+        monkeypatch.setenv("TAUT_THREADS", bad)
         assert _apply_thread_limit() is None
-    monkeypatch.setenv("LAYA_THREADS", "8")
+    monkeypatch.setenv("TAUT_THREADS", "8")
     assert _apply_thread_limit() == 8
     import torch
     assert torch.get_num_threads() == 8
@@ -150,7 +150,7 @@ def test_inference_runs_off_the_event_loop(monkeypatch):
 
     import httpx
 
-    monkeypatch.delenv("LAYA_API_KEY", raising=False)
+    monkeypatch.delenv("TAUT_API_KEY", raising=False)
     fake = FakeRouter()
     seen = []
     real_predict = fake.predict
@@ -182,7 +182,7 @@ def test_health_stays_available_during_inference(monkeypatch):
 
     import httpx
 
-    monkeypatch.delenv("LAYA_API_KEY", raising=False)
+    monkeypatch.delenv("TAUT_API_KEY", raising=False)
     fake = SlowRouter(seconds=0.25)
     app = create_app(router=fake)
     seen = {}
@@ -210,14 +210,14 @@ def test_health_stays_available_during_inference(monkeypatch):
 
 
 # ---------------------------------------------------------------- certified risk gating
-# With LAYA_GATE set the server stops being a scorer and becomes a decision service.
+# With TAUT_GATE set the server stops being a scorer and becomes a decision service.
 # The gate is the operator's, loaded once at startup, and never a request field.
 
 def _fitted_gate(alpha=0.05, delta=0.05, mode="selective"):
     """A real ConformalGate over the question FakeRouter answers."""
     import numpy as np
 
-    from laya.conformal import ConformalGate
+    from taut.conformal import ConformalGate
 
     rng = np.random.default_rng(3)
     results, labels = [], []
@@ -243,15 +243,15 @@ def _gate_file(tmp_path, gate):
 
 
 def test_ungated_server_reports_no_gate(monkeypatch):
-    monkeypatch.delenv("LAYA_GATE", raising=False)
+    monkeypatch.delenv("TAUT_GATE", raising=False)
     client, _ = _client(monkeypatch)
     assert client.get("/health").json()["gate"] is None
     assert "gate" not in client.post("/v1/systemone", json=REQ).json()
 
 
 def test_gate_from_env_certifies_every_answer(monkeypatch, tmp_path):
-    monkeypatch.delenv("LAYA_API_KEY", raising=False)
-    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate()))
+    monkeypatch.delenv("TAUT_API_KEY", raising=False)
+    monkeypatch.setenv("TAUT_GATE", _gate_file(tmp_path, _fitted_gate()))
     client = TestClient(create_app(router=FakeRouter()))
 
     body = client.post("/v1/systemone", json=REQ).json()
@@ -268,7 +268,7 @@ def test_gate_from_env_certifies_every_answer(monkeypatch, tmp_path):
 
 
 def test_health_advertises_the_contract(monkeypatch, tmp_path):
-    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
+    monkeypatch.setenv("TAUT_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
     client = TestClient(create_app(router=FakeRouter()))
     g = client.get("/health").json()["gate"]
     assert g["alpha"] == 0.02
@@ -278,14 +278,14 @@ def test_health_advertises_the_contract(monkeypatch, tmp_path):
 
 
 def test_injected_gate_overrides_the_environment(monkeypatch, tmp_path):
-    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
+    monkeypatch.setenv("TAUT_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
     client = TestClient(create_app(router=FakeRouter(), risk_gate=_fitted_gate(alpha=0.10)))
     assert client.get("/health").json()["gate"]["alpha"] == 0.10
 
 
 def test_strict_mode_rejects_uncalibrated_questions(monkeypatch, tmp_path):
-    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate()))
-    monkeypatch.setenv("LAYA_GATE_STRICT", "1")
+    monkeypatch.setenv("TAUT_GATE", _gate_file(tmp_path, _fitted_gate()))
+    monkeypatch.setenv("TAUT_GATE_STRICT", "1")
     client = TestClient(create_app(router=FakeRouter()))
     # FakeRouter always answers "dept"; a gate fitted on something else must 422 rather
     # than pass the answer through wearing no guarantee.
@@ -295,7 +295,7 @@ def test_strict_mode_rejects_uncalibrated_questions(monkeypatch, tmp_path):
 
     import numpy as np
 
-    from laya.conformal import ConformalGate
+    from taut.conformal import ConformalGate
     rng = np.random.default_rng(5)
     res = [{"answers": {"other_q": {"type": "noul", "noul": float(rng.beta(5, 2)),
                                     "confidence": 0.8}}} for _ in range(400)]
@@ -311,7 +311,7 @@ def test_strict_mode_rejects_uncalibrated_questions(monkeypatch, tmp_path):
 def test_a_gate_that_will_not_load_stops_the_server(monkeypatch, tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text("{not json", encoding="utf-8")
-    monkeypatch.setenv("LAYA_GATE", str(bad))
+    monkeypatch.setenv("TAUT_GATE", str(bad))
     # Serving ungated while advertising a guarantee is the worst outcome available,
     # so a broken gate is fatal rather than a warning.
     with pytest.raises(RuntimeError, match="could not be loaded as a conformal gate"):
@@ -320,7 +320,7 @@ def test_a_gate_that_will_not_load_stops_the_server(monkeypatch, tmp_path):
 
 def test_gate_is_not_a_request_field(monkeypatch, tmp_path):
     """A caller must not be able to name its own risk budget."""
-    monkeypatch.setenv("LAYA_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
+    monkeypatch.setenv("TAUT_GATE", _gate_file(tmp_path, _fitted_gate(alpha=0.02)))
     client = TestClient(create_app(router=FakeRouter()))
     body = client.post("/v1/systemone", json=dict(REQ, alpha=0.5, gate={"alpha": 0.5})).json()
     assert body["answers"]["dept"]["gate"]["alpha"] == 0.02

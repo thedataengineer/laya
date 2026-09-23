@@ -17,7 +17,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from laya.router import Router, _english_from_code  # noqa: E402
+from taut.router import Router, _english_from_code  # noqa: E402
 
 PASS, FAIL = [], []
 
@@ -111,7 +111,7 @@ check("payload/reason records the caller hint", "lang_guess" in d["reason"], Tru
 check_true("payload/detection is None when the hint decided it", d["detection"] is None)
 check("payload/installed hint names its source",
       "Router(lang_guess=...)" in Router(lang_guess="ro").route(ROMANIAN, GENERIC)["reason"], True)
-check_true("payload/repo points at the bundle", "convaiinnovations/laya" in d["repo"])
+check_true("payload/repo points at the bundle", "thekarteek/taut" in d["repo"])
 
 # ------------------------------------------------------------------ predict forwards it
 class _FakeAgent:
@@ -161,7 +161,7 @@ check("helper/only a dot", _english_from_code("."), None)
 # the standalone-repo mapping is untouched
 r_alone = Router(standalone_repos=True, lang_guess="ro")
 check("standalone/hint still uses the standalone repo",
-      r_alone.route(ROMANIAN, GENERIC)["repo"], "convaiinnovations/laya-multilingual")
+      r_alone.route(ROMANIAN, GENERIC)["repo"], "thekarteek/taut-multilingual")
 
 # nothing without a hint moves
 # The expected model is pinned per case. Comparing `r0.route(...)` against a fresh
