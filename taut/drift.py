@@ -27,13 +27,25 @@ the distribution the gate was fitted against still describes what is arriving:
     0.01. The statistic is floored accordingly rather than reported as though the sketch
     were the calibration set.
 
-**What this cannot tell you, and the distinction matters.** Both tests watch the *scores*.
-A shift in the score-to-correctness link -- same confidences, worse answers -- moves real
-risk while leaving both tests quiet. Stable scores are necessary for the guarantee to
-survive, not sufficient for it. A clean report means "no evidence the gate has expired",
-never "the gate still holds". The only thing that re-establishes the guarantee is refitting
-on freshly labelled data, and this module's job is to tell you *when* that is overdue, not
-to excuse you from it.
+Both of those watch the *scores*, and a shift in the score-to-correctness link -- same
+confidences, worse answers -- moves real risk while leaving them quiet. Stable scores are
+necessary for the guarantee to survive, not sufficient for it. Closing that half needs
+labels, so the third test asks for a few:
+
+``risk``
+    Feed ``audit()`` a small, **randomly sampled** slice of live traffic with gold labels
+    and it tests the realised loss directly against ``alpha`` -- an exact one-sided
+    binomial test, in the same terms the gate certified. This is the only test here that
+    can say the guarantee itself has broken rather than that its inputs moved.
+
+    :func:`audit_size` says how many labels that takes. Detecting a doubling of a 2%
+    budget at 80% power needs 424 audited rows, and a rise from 2% to 10% needs 54 --
+    because the question is coarse: has risk left the budget, not what exactly is it now.
+
+Without an audit a clean report means "no evidence the gate has expired", never "the gate
+still holds". With one it means rather more. Either way the only thing that re-establishes
+the guarantee is refitting on freshly labelled data; this module tells you *when* that is
+overdue, not how to avoid it.
 
 Pure NumPy, like the gate itself.
 
@@ -57,9 +69,10 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 
-from .conformal import ConformalGate, QuestionGate, gate_score
+from .conformal import ConformalGate, QuestionGate, gate_loss, gate_score
 
-__all__ = ["GateMonitor", "binomial_two_sided_p", "ks_two_sample", "ks_p_value"]
+__all__ = ["GateMonitor", "audit_size", "binomial_two_sided_p",
+           "binomial_upper_tail_p", "ks_two_sample", "ks_p_value"]
 
 # Below this the tests have no power worth reporting, so the monitor says "watching"
 # rather than producing a verdict from a handful of requests.
@@ -99,6 +112,60 @@ def binomial_two_sided_p(k: int, n: int, p: float) -> float:
     # A relative tolerance keeps ties on the far side of the mode from being dropped by
     # floating-point noise, which would understate the p-value.
     return float(pmf[pmf <= pmf[k] * (1.0 + 1e-9)].sum())
+
+
+def binomial_upper_tail_p(k: int, n: int, p: float) -> float:
+    """``P(X >= k)`` for ``X ~ Bin(n, p)``: evidence that the true rate exceeds ``p``.
+
+    One-sided on purpose. An audit asks a single question -- has realised loss left the
+    budget -- and risk *below* ``alpha`` is the gate working, not a finding.
+    """
+    if n <= 0:
+        return 1.0
+    if k <= 0:
+        return 1.0
+    p = min(max(float(p), 0.0), 1.0)
+    if p <= 0.0:
+        return 0.0 if k > 0 else 1.0
+    if p >= 1.0:
+        return 1.0
+    i = np.arange(n + 1)
+    log_coeff = np.concatenate(([0.0], np.cumsum(np.log(np.arange(n, 0, -1))
+                                                 - np.log(np.arange(1, n + 1)))))
+    log_pmf = log_coeff + i * math.log(p) + (n - i) * math.log1p(-p)
+    pmf = np.exp(log_pmf - log_pmf.max())
+    pmf /= pmf.sum()
+    return float(pmf[k:].sum())
+
+
+def audit_size(alpha: float, detect: float, power: float = 0.8,
+               level: float = 0.05) -> int:
+    """Audited rows needed to notice that risk has risen from ``alpha`` to ``detect``.
+
+    Exact, by searching upward for the smallest ``n`` whose rejection region -- the
+    smallest ``k`` with ``P(X >= k | alpha) <= level`` -- is reached with probability at
+    least ``power`` when the true rate is ``detect``.
+
+    The number is usually smaller than people expect, and that is the argument for
+    auditing at all: a doubling of a 2% budget takes 424 labels at 80% power, and a jump
+    from 2% to 10% takes 54 -- against the thousands that refitting a gate would need.
+    """
+    if not (0.0 < alpha < 1.0):
+        raise ValueError("alpha must lie in (0, 1); got %r" % (alpha,))
+    if not (0.0 < power < 1.0) or not (0.0 < level < 1.0):
+        raise ValueError("power and level must both lie in (0, 1)")
+    if detect <= alpha:
+        raise ValueError("detect must exceed alpha; there is nothing to notice at %r"
+                         % (detect,))
+    for n in range(1, 100_001):
+        k = next((j for j in range(n + 1) if binomial_upper_tail_p(j, n, alpha) <= level),
+                 None)
+        if k is None:
+            continue
+        if 1.0 - binomial_upper_tail_p(k, n, detect) <= 1.0 - power:
+            return n
+    raise ValueError("no practical sample size detects %r against %r at power %r"
+                     % (detect, alpha, power))
 
 
 def ks_two_sample(scores: Sequence[float], sketch: Mapping[str, Any]) -> Dict[str, Any]:
@@ -198,7 +265,11 @@ class GateMonitor:
         self.alpha_test = float(alpha_test)
         self._scores: Dict[str, List[float]] = {q: [] for q in gate.gates}
         self._accepted: Dict[str, List[bool]] = {q: [] for q in gate.gates}
+        # Audited rows are kept separately and are NOT windowed: labels are scarce, and
+        # silently ageing them out would shrink the one test that can see real risk.
+        self._audit: Dict[str, List[bool]] = {q: [] for q in gate.gates}
         self.n_seen = 0
+        self.n_audited = 0
 
     # -- ingestion ----------------------------------------------------------------
 
@@ -222,6 +293,41 @@ class GateMonitor:
         for r in results:
             self.observe(r)
 
+    def audit(self, result: Mapping[str, Any], labels: Mapping[str, Any]) -> None:
+        """Record one labelled row, so realised risk can be tested against ``alpha``.
+
+        The row must come from a **random sample of live traffic**. Labelling the cases
+        that looked wrong, or only the ones the gate accepted, biases the estimate in the
+        direction that makes the guarantee look worst or best respectively, and the test
+        below has no way to detect that it happened. Sample first, label second.
+
+        Audited rows also count as observed, so a caller need not feed the same result to
+        both methods.
+        """
+        if not isinstance(labels, Mapping):
+            raise ValueError("labels must be a mapping of question id to gold answer")
+        self.observe(result)
+        answers = result.get("answers", result)
+        audited = False
+        for qid, qgate in self.gate.gates.items():
+            answer = answers.get(qid)
+            if answer is None or qid not in labels or labels[qid] is None:
+                continue
+            loss, counted = gate_loss(qgate, answer, labels[qid])
+            if counted:
+                self._audit[qid].append(bool(loss))
+            audited = True
+        if audited:
+            self.n_audited += 1
+
+    def audit_batch(self, results: Sequence[Mapping[str, Any]],
+                    labels: Sequence[Mapping[str, Any]]) -> None:
+        if len(results) != len(labels):
+            raise ValueError("results and labels must be the same length; got %d and %d"
+                             % (len(results), len(labels)))
+        for r, l in zip(results, labels):
+            self.audit(r, l)
+
     def _push(self, buf: List[Any], value: Any) -> None:
         buf.append(value)
         if len(buf) > self.window:
@@ -237,8 +343,10 @@ class GateMonitor:
         freshly labelled data before its guarantee is quoted again.
         """
         questions: Dict[str, Any] = {}
-        # Two tests per question, so the per-test level is split accordingly.
-        n_tests = max(1, 2 * len(self.gate.gates))
+        # Up to three tests per question, so the per-test level is split accordingly.
+        # Questions with no audited rows still count: the correction must not depend on
+        # how the data happened to arrive, or it would drift with the traffic.
+        n_tests = max(1, 3 * len(self.gate.gates))
         level = self.alpha_test / n_tests
 
         for qid, qgate in self.gate.gates.items():
@@ -247,7 +355,19 @@ class GateMonitor:
             n = len(scores)
             entry: Dict[str, Any] = {"mode": qgate.mode, "n_observed": n}
 
+            audited = self._audit[qid]
+            risk_block = self._risk_test(qgate, audited, level)
+            if risk_block is not None:
+                entry["risk"] = risk_block
+
             if n < _MIN_OBSERVATIONS:
+                if risk_block is not None and risk_block.get("drifted"):
+                    # Realised risk outranks "not enough traffic to say": a breach the
+                    # labels already prove does not become tentative for want of volume.
+                    entry["status"] = "expired"
+                    entry["reason"] = risk_block["reason"]
+                    questions[qid] = entry
+                    continue
                 entry["status"] = "watching"
                 entry["reason"] = ("%d of %d requests needed before a verdict carries any "
                                    "power" % (n, _MIN_OBSERVATIONS))
@@ -286,6 +406,9 @@ class GateMonitor:
                 entry["scores"] = {"unavailable": "gate carries no calibration sketch; "
                                                   "refit to enable the score test"}
 
+            if risk_block is not None and risk_block.get("drifted"):
+                drifted.insert(0, risk_block["reason"])
+
             entry["status"] = "expired" if drifted else "ok"
             if drifted:
                 entry["reason"] = "; ".join(drifted)
@@ -306,9 +429,47 @@ class GateMonitor:
             "alpha_test": self.alpha_test,
             "per_test_level": level,
             "questions": questions,
-            "caveat": ("these tests watch scores, not correctness; a clean result is "
-                       "no evidence of expiry, not proof the guarantee still holds"),
+            "n_audited": self.n_audited,
+            "caveat": ("the acceptance and score tests watch scores, not correctness; "
+                       "without audited rows a clean result is no evidence of expiry, "
+                       "not proof the guarantee still holds"),
         }
+
+    def _risk_test(self, qgate: QuestionGate, audited: Sequence[bool],
+                   level: float) -> Optional[Dict[str, Any]]:
+        """Exact one-sided binomial test of realised loss against the gate's own alpha."""
+        n = len(audited)
+        if n == 0:
+            return None
+        k = int(sum(audited))
+        alpha = float(qgate.alpha)
+        p = binomial_upper_tail_p(k, n, alpha)
+        drifted = bool(p < level)
+        block = {
+            "n_audited": n,
+            "observed_loss": k,
+            "observed_risk": k / n,
+            "alpha": alpha,
+            "p_value": p,
+            "drifted": drifted,
+            "denominator": ("positives" if qgate.mode == "miss" else "audited rows"),
+        }
+        if drifted:
+            block["reason"] = ("realised risk %.3g exceeds the %.3g budget on %d audited "
+                               "rows (p=%.2g)" % (k / n, alpha, n, p))
+        else:
+            # Absence of evidence is not evidence of absence, and an auditor deserves the
+            # difference spelled out rather than implied by a green status.
+            detect = min(0.999, max(alpha * 2.0, alpha + 0.01))
+            try:
+                need = audit_size(alpha, detect, power=0.8, level=level)
+            except ValueError:
+                need = None
+            block["note"] = ("no evidence risk has left the budget; %s"
+                             % ("%d audited rows would give 80%% power to notice it "
+                                "doubling, and there are %d" % (need, n) if need
+                                else "power at this budget is limited by sample size"))
+        return block
 
     def report(self) -> str:
         """The check as a table, for a log line or an alert body."""
@@ -316,7 +477,7 @@ class GateMonitor:
         lines = ["Taut gate drift  status=%s  seen=%d  window=%d  level=%.2g per test"
                  % (res["status"], res["n_seen"], res["window"], res["per_test_level"])]
         lines.append("")
-        header = "%-22s %-10s %-9s %-16s %s" % ("question", "mode", "status", "acceptance", "scores")
+        header = "%-22s %-10s %-9s %-16s %-18s %s" % ("question", "mode", "status", "acceptance", "scores", "audited risk")
         lines.append(header)
         lines.append("-" * len(header))
         for qid, e in res["questions"].items():
@@ -325,7 +486,11 @@ class GateMonitor:
                                            100 * acc["calibrated_rate"])) if acc else "n/a"
             sc = e.get("scores") or {}
             sc_s = ("KS=%.3f p=%.2g" % (sc["statistic"], sc["p_value"])) if "statistic" in sc else "n/a"
-            lines.append("%-22s %-10s %-9s %-16s %s" % (qid[:22], e["mode"], e["status"], acc_s, sc_s))
+            rk = e.get("risk")
+            rk_s = ("%.2f%% of %d (a=%.3g)" % (100 * rk["observed_risk"], rk["n_audited"],
+                                               rk["alpha"])) if rk else "not audited"
+            lines.append("%-22s %-10s %-9s %-16s %-18s %s"
+                         % (qid[:22], e["mode"], e["status"], acc_s, sc_s, rk_s))
         for qid, e in res["questions"].items():
             if e.get("reason") and e["status"] == "expired":
                 lines.append("")
@@ -333,6 +498,12 @@ class GateMonitor:
         if res["status"] == "expired":
             lines.append("")
             lines.append("  Refit on freshly labelled traffic before quoting the guarantee again.")
+        if not any(e.get("risk") for e in res["questions"].values()):
+            lines.append("")
+            lines.append("  No rows audited. The tests above watch scores, so they cannot "
+                         "see the model")
+            lines.append("  getting worse at unchanged confidence. audit() closes that; "
+                         "audit_size() prices it.")
         lines.append("")
         lines.append("  %s" % res["caveat"])
         return "\n".join(lines)

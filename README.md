@@ -777,11 +777,67 @@ catches a 9% change in logit separation 91% of the time, and anything larger ess
 always. A monitor that cries wolf gets muted, which is worse than not having one, so that
 number is tested in CI rather than asserted here.
 
-**What it cannot tell you, and the distinction matters.** Both tests watch the *scores*. A
-shift in the score-to-correctness link — same confidences, worse answers — moves real risk
-while leaving both tests quiet. A clean report means "no evidence the gate has expired",
-never "the gate still holds". Only refitting on freshly labelled data restores the
-guarantee; this tells you when that is overdue.
+Both of those watch the *scores*, though — and a model that gets worse at unchanged
+confidence moves real risk while leaving them silent. Closing that half needs labels, so
+the third test asks for a few.
+
+### Audit a handful of labels, and the blind spot closes
+
+```python
+monitor.audit(gated_result, {"intent": "billing"})   # a randomly sampled, labelled row
+```
+
+That tests realised loss directly against `alpha`, with an exact one-sided binomial test,
+in the same terms the gate certified. Here is the same model with its *scores untouched*
+and 35% of its answers quietly corrupted:
+
+```
+question               mode       status    acceptance       scores             audited risk
+--------------------------------------------------------------------------------------------
+intent                 selective  expired   69.8% vs 71.7%   KS=0.037 p=0.45    22.50% of 600 (a=0.05)
+
+  intent: realised risk 0.225 exceeds the 0.05 budget on 600 audited rows (p=4.1e-49)
+```
+
+The acceptance test sees nothing. The KS test sees nothing — p=0.45. Neither is broken;
+the scores genuinely did not move. Only the audit can see it, and it is decisive.
+
+Measured across corruption levels, score tests versus the audit:
+
+| labels corrupted | score test fires | acceptance test fires | audit fires |
+|---|---|---|---|
+| 0% | no | no | 0/60 |
+| 5% | no | no | 3/60 |
+| 10% | no | no | 33/60 |
+| 25% | no | no | 60/60 |
+
+**It costs fewer labels than people expect**, which is the argument for doing it at all:
+
+```python
+>>> from taut.drift import audit_size
+>>> audit_size(alpha=0.02, detect=0.04)     # notice the budget doubling, 80% power
+424
+>>> audit_size(alpha=0.05, detect=0.10)
+169
+```
+
+A few hundred labels a cycle, against the thousands that refitting a gate would need — the
+question is coarse (*has* risk left the budget, not what exactly it is now), and coarse
+questions are cheap.
+
+The sample must be **random**. Labelling the cases that looked wrong, or only the ones the
+gate accepted, biases the estimate and the test cannot detect that it happened. Sample
+first, label second.
+
+A clean audit still reports what power it had rather than implying certainty:
+
+```
+no evidence risk has left the budget; 332 audited rows would give 80% power to notice
+it doubling, and there are 400
+```
+
+Only refitting on freshly labelled data restores the guarantee. This tells you when that
+is overdue.
 
 ### Is the bound real?
 

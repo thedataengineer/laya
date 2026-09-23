@@ -76,7 +76,9 @@ most `delta`. The guarantee language is safe to ship.
 | `tests/test_conformal.py` | 152 checks, runs in ~1.2 s |
 | `tests/test_serve.py` | 7 new gating tests |
 | `tests/test_cli.py` | 11 new gating tests |
-| `taut/drift.py` | `GateMonitor`: label-free expiry detection over a fitted gate |
+| `taut/drift.py` | `GateMonitor`: expiry detection, label-free plus a labelled audit |
+| `taut/conformal.py` | cost-optimal operating points over the certified set |
+| `taut/cli.py` | `taut calibrate`: fit and measure a gate from labelled JSONL |
 | `tests/test_drift.py` | 76 checks, runs in ~0.7 s |
 | `research/conformal/` | validation harness and its results |
 | `README.md`, `BENCHMARKS.md` | the competitive claim, with the evidence behind it |
@@ -102,10 +104,19 @@ undrifted traffic against a 1% test level, and it catches a 2.2 → 2.0 shift in
 separation in 137 of 150 windows, 150/150 at 1.8 and beyond. Both numbers are asserted in
 `tests/test_drift.py`, not just measured once.
 
-The limit is stated everywhere it is reported, including in `report()` itself: both tests
-watch *scores*. A shift in the score-to-correctness link — same confidences, worse answers
-— moves real risk while leaving both quiet. A clean report is "no evidence of expiry",
-never "the guarantee still holds".
+Both of those watch *scores*, and a model that gets worse at unchanged confidence moves
+real risk while leaving them silent. `GateMonitor.audit()` closes that half: an exact
+one-sided binomial test of realised loss against the gate's own `alpha`, in the terms the
+gate certified — including the label-conditional denominator a `miss` gate needs.
+
+Measured on a model whose scores are untouched and whose labels are corrupted, the score
+tests fire 0 times at every level while the audit fires 33/60 at 10% corruption and 60/60
+at 25%. That is the blind spot closing, demonstrated rather than asserted.
+
+`audit_size()` prices it: 424 rows to notice a 2% budget doubling at 80% power, 169 for a
+5% budget going to 10%. Cheap, because the question is coarse. The sample must be random —
+labelling what looked wrong biases the estimate and the test cannot detect that it
+happened, which is stated at every point the API touches.
 
 **Every number in `research/conformal/` is synthetic.** The bound is distribution-free, so
 that is sound for validating the guarantee — validity cannot depend on the generator. It is
@@ -114,10 +125,6 @@ an actual ticket queue is unmeasured, and that is the number a buyer will ask fo
 
 ## Not started
 
-- **Correctness-link drift**, the half `GateMonitor` cannot see. Detecting it needs labels,
-  but not many: a small periodically-labelled audit sample would let the monitor test
-  observed risk against `alpha` directly, turning "no evidence of expiry" into a real
-  statement about the guarantee. This is the highest-value remaining item.
 - `Agent.predict(gate=...)` convenience wiring (the `Router`/serve path covers the real use).
 - A `TautGate` LangChain runnable, alongside the existing `TautRouter` / `TautGuardrail`.
 - Real-traffic coverage numbers on a public dataset with labels, to replace the synthetic

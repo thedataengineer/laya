@@ -280,11 +280,127 @@ ms.observe_batch(shift_r)
 check("modes/miss notices a prevalence shift",
       ms.check()["questions"]["unsafe"]["status"], "expired")
 
+# ------------------------------------------------------------------ labelled audit
+# The one test that can see the guarantee break rather than its inputs move.
+from taut.drift import audit_size, binomial_upper_tail_p  # noqa: E402
+
+
+def reference_upper_tail(k, n, p):
+    return sum(math.comb(n, i) * p ** i * (1 - p) ** (n - i) for i in range(k, n + 1))
+
+
+worst_tail = max(abs(binomial_upper_tail_p(k, n, p) - reference_upper_tail(k, n, p))
+                 for n in (20, 60, 100) for p in (0.02, 0.05, 0.2)
+                 for k in range(0, n + 1, max(1, n // 10)))
+ok("audit/one-sided test matches its defining sum", worst_tail < 1e-9,
+   "max deviation %.2e" % worst_tail)
+check("audit/k=0 is never evidence", binomial_upper_tail_p(0, 100, 0.05), 1.0)
+ok("audit/is one sided: a low count is not a finding",
+   binomial_upper_tail_p(1, 500, 0.05) > 0.99)
+ok("audit/a high count is", binomial_upper_tail_p(60, 500, 0.05) < 1e-6)
+
+ok("audit/sample size grows as the effect shrinks",
+   audit_size(0.02, 0.04) > audit_size(0.02, 0.10))
+ok("audit/and as power rises", audit_size(0.02, 0.04, power=0.9) > audit_size(0.02, 0.04))
+ok("audit/a doubling of a 2% budget takes a few hundred rows",
+   300 < audit_size(0.02, 0.04) < 600, "got %d" % audit_size(0.02, 0.04))
+raises("audit/there is nothing to detect below the budget",
+       lambda: audit_size(0.05, 0.05), "must exceed alpha")
+raises("audit/rejects a degenerate alpha", lambda: audit_size(0.0, 0.5), "must lie in")
+raises("audit/rejects a degenerate power", lambda: audit_size(0.05, 0.1, power=1.0),
+       "must both lie in")
+
+
+def audited(n, seed, margin=2.2, flip=0.0, gate=GATE):
+    """Audit `n` rows; `flip` corrupts the *labels* only, leaving scores untouched."""
+    results, labels = gen(n, seed, margin)
+    r = np.random.default_rng(seed + 991)
+    if flip:
+        labels = [{"q": (KEYS[int(r.integers(0, 4))] if r.random() < flip else l["q"])}
+                  for l in labels]
+    m = GateMonitor(gate, window=5000)
+    m.audit_batch([gate.apply(x) for x in results], labels)
+    return m
+
+
+clean = audited(600, 4242)
+check("audit/an honest sample does not fire", clean.check()["status"], "ok")
+rb = clean.check()["questions"]["q"]["risk"]
+check("audit/counts what it audited", rb["n_audited"], 600)
+ok("audit/observed risk sits under the budget", rb["observed_risk"] <= 0.05 + 0.02,
+   "observed %.4f" % rb["observed_risk"])
+check("audit/reports the budget it tested against", rb["alpha"], 0.05)
+check("audit/names its denominator", rb["denominator"], "audited rows")
+ok("audit/a clean result is not a proof", "no evidence" in rb["note"], rb["note"])
+ok("audit/and prices the power it had", "80% power" in rb["note"], rb["note"])
+check("audit/monitor counts audited rows", clean.n_audited, 600)
+ok("audit/audited rows also count as observed", clean.n_seen == 600)
+
+# The failure the score tests structurally cannot see: same confidences, worse answers.
+rotten = audited(600, 4243, flip=0.35)
+rot = rotten.check()["questions"]["q"]
+check("audit/catches correctness drift at unchanged scores", rot["status"], "expired")
+ok("audit/the risk test is what fired", rot["risk"]["drifted"] is True)
+ok("audit/while the score test stays quiet", rot["scores"]["drifted"] is False,
+   "KS=%.4f" % rot["scores"]["statistic"])
+ok("audit/and the acceptance test stays quiet", rot["acceptance"]["drifted"] is False)
+ok("audit/says what it measured", "exceeds the" in rot["risk"]["reason"], rot["risk"].get("reason"))
+
+# False alarms are what decide whether an audit stays switched on.
+alarms = sum(audited(400, 8000 + t).check()["status"] == "expired" for t in range(40))
+ok("audit/false-alarm rate stays low", alarms <= 2, "%d/40 clean audits fired" % alarms)
+
+# Realised risk outranks "not enough traffic to say".
+thin = GateMonitor(GATE, window=5000)
+thin_r, thin_l = gen(40, 4244)
+bad_l = [{"q": KEYS[(KEYS.index(l["q"]) + 1) % 4]} for l in thin_l]   # every label wrong
+thin.audit_batch([GATE.apply(x) for x in thin_r], bad_l)
+check("audit/a proven breach is not downgraded to watching", thin.check()["status"], "expired")
+
+# A miss gate is audited on positives only.
+ms_r = []
+r2 = np.random.default_rng(31)
+truth = []
+for _ in range(800):
+    pos = bool(r2.random() < 0.2)
+    pt = float(r2.beta(6, 2) if pos else r2.beta(2, 6))
+    ms_r.append({"answers": {"unsafe": {"type": "noul", "noul": pt,
+                                        "confidence": max(pt, 1 - pt)}}})
+    truth.append({"unsafe": pos})
+mg = GateMonitor(multi_gate, window=2000)
+mg.audit_batch([multi_gate.apply(x) for x in ms_r], truth)
+mrisk = mg.check()["questions"]["unsafe"]["risk"]
+check("audit/a miss gate is audited on positives", mrisk["denominator"], "positives")
+ok("audit/so its denominator is the positive count",
+   mrisk["n_audited"] == sum(t["unsafe"] for t in truth),
+   "%d audited vs %d positives" % (mrisk["n_audited"], sum(t["unsafe"] for t in truth)))
+
+# Ingestion guards and reporting.
+raises("audit/rejects non-mapping labels", lambda: clean.audit({"answers": {}}, ["a"]),
+       "must be a mapping")
+raises("audit/rejects mismatched batch lengths",
+       lambda: clean.audit_batch([{"answers": {}}], []), "same length")
+partial_m = GateMonitor(GATE, window=500)
+partial_m.audit({"answers": {"q": gen(1, 5)[0][0]["answers"]["q"]}}, {"other": 1})
+check("audit/a label for another question is ignored", len(partial_m._audit["q"]), 0)
+ok("audit/but the row still counts as observed", partial_m.n_seen == 1)
+
+ok("audit/unaudited monitors say so in the report",
+   "No rows audited" in watch(2.2, 4245).report())
+ok("audit/audited monitors show the column",
+   "of 600 (a=0.05)" in clean.report(), clean.report())
+ok("audit/report names the audited-risk column", "audited risk" in clean.report())
+
 # ------------------------------------------------------------------ Bonferroni
+# Three tests per question -- acceptance, scores, audited risk -- and the correction
+# counts all three whether or not labels happened to arrive, so the level does not drift
+# with the traffic.
 one = GateMonitor(GATE, alpha_test=0.01).check()["per_test_level"]
 two = GateMonitor(multi_gate, alpha_test=0.01).check()["per_test_level"]
-ok("bonferroni/level splits across tests", abs(one - 0.005) < 1e-12, "got %r" % one)
-ok("bonferroni/and across questions", abs(two - 0.0025) < 1e-12, "got %r" % two)
+ok("bonferroni/level splits across the three tests", abs(one - 0.01 / 3) < 1e-12, "got %r" % one)
+ok("bonferroni/and across questions", abs(two - 0.01 / 6) < 1e-12, "got %r" % two)
+ok("bonferroni/does not move when rows are audited",
+   GateMonitor(GATE, alpha_test=0.01).check()["per_test_level"] == one)
 
 # ------------------------------------------------------------------ legacy gates
 legacy = ConformalGate.from_dict(GATE.to_dict())

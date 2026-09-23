@@ -77,6 +77,7 @@ __all__ = [
     "conformal_quantile",
     "SUPPORTED_MODES",
     "gate_score",
+    "gate_loss",
 ]
 
 # Modes a question can be gated with. `auto` picks by question type.
@@ -1239,3 +1240,35 @@ def gate_score(gate: "QuestionGate", answer: Mapping[str, Any]) -> float:
     if gate.mode == "interval":
         return float((p * np.arange(p.size, dtype=np.float64)).sum())
     return float(p.max())
+
+
+def gate_loss(gate: "QuestionGate", answer: Mapping[str, Any],
+              gold: Any) -> Tuple[bool, bool]:
+    """``(loss, counted)`` for one labelled row, in the terms this gate certifies.
+
+    Every mode reduces to the same shape -- a loss event and the denominator it is
+    measured against -- but *which* event and *which* denominator differs, and getting it
+    wrong measures a quantity the guarantee never made a claim about:
+
+    ``selective``  accepted and wrong, over every row.
+    ``miss``       a positive that was not blocked, over the **positives only**; benign
+                   rows are not counted, because the guarantee is label-conditional.
+    ``set``        the truth outside the prediction set, over every row.
+    ``interval``   the truth outside the interval, over every row.
+
+    Keeping this beside :func:`gate_score` means an auditor never has to re-derive it, and
+    a new mode has exactly one place to declare what it is promising.
+    """
+    qtype, keys, p = _answer_distribution(answer)
+    block = gate.apply(answer)
+    idx = _normalise_label(gate.qtype, keys, gold)
+
+    if gate.mode == "miss":
+        positive = idx == 1
+        return (positive and not block["blocked"]), positive
+    if gate.mode == "selective":
+        return (bool(block["accepted"]) and int(p.argmax()) != idx), True
+    if gate.mode == "set":
+        return (keys[idx] not in block["prediction_set"]), True
+    lo, hi = block["interval"]
+    return (not (lo <= float(idx) <= hi)), True
