@@ -80,7 +80,8 @@ most `delta`. The guarantee language is safe to ship.
 | `taut/conformal.py` | cost-optimal operating points over the certified set |
 | `taut/cli.py` | `taut calibrate`: fit and measure a gate from labelled JSONL |
 | `tests/test_drift.py` | 76 checks, runs in ~0.7 s |
-| `research/conformal/` | validation harness and its results |
+| `taut/integrations/` | `TautGate`: branch a LangGraph edge on the guarantee |
+| `research/conformal/` | the validation harness, the real-traffic benchmark, and both sets of results |
 | `README.md`, `BENCHMARKS.md` | the competitive claim, with the evidence behind it |
 
 `interval` mode, never exercised before, now has fresh-split coverage measured: 0.9152 at
@@ -118,14 +119,27 @@ at 25%. That is the blind spot closing, demonstrated rather than asserted.
 labelling what looked wrong biases the estimate and the test cannot detect that it
 happened, which is stated at every point the API touches.
 
-**Every number in `research/conformal/` is synthetic.** The bound is distribution-free, so
-that is sound for validating the guarantee — validity cannot depend on the generator. It is
-*not* evidence about coverage on real traffic. What `alpha = 0.02` costs in kept traffic on
-an actual ticket queue is unmeasured, and that is the number a buyer will ask for first.
+**Coverage on real traffic is now measured, and it is not flattering.**
+`research/conformal/benchmark_massive.py` fits on half of MASSIVE intent and reports the
+other half. English, zero-shot, 20-way fixed taxonomy, 60.4% ungated accuracy: a 10% budget
+buys 40.4% of traffic at a held-out risk of 0.0325, and **5% is not certifiable at all**.
+Five languages mixed: 49.3% accuracy, 5% buys 16.5%.
+
+Those "not certifiable" rows are the most valuable thing in the table and should not be
+tuned away. They are the thesis working on real data: at this accuracy nothing holds the
+error rate under 5%, and the gate says so instead of returning a threshold that buys
+nothing. The fix is a better checkpoint, not a looser gate.
+
+The obvious next move is to fine-tune on a domain and re-run the same table. The delta
+between "zero-shot buys 40% at alpha=0.10" and whatever fine-tuning buys is the clearest
+possible argument for both the fine-tuning path and the gate.
 
 ## Not started
 
 - `Agent.predict(gate=...)` convenience wiring (the `Router`/serve path covers the real use).
 - A `TautGate` LangChain runnable, alongside the existing `TautRouter` / `TautGuardrail`.
-- Real-traffic coverage numbers on a public dataset with labels, to replace the synthetic
-  coverage column in `BENCHMARKS.md`.
+- Re-run `benchmark_massive.py` against a fine-tuned checkpoint. The coverage delta against
+  the zero-shot table is the strongest argument the project has, and it is one training run
+  away.
+- A `taut audit` CLI subcommand over `GateMonitor.audit`, so the labelled audit is as easy
+  to run as `taut calibrate`.

@@ -83,6 +83,25 @@ stand behind, the gate blocks everything — zero breaches, and a block rate of 
 tells the operator plainly that the budget is unaffordable at this sample size. Refusing
 is a feature; it is the difference between a guarantee and a number.
 
+## The other question: what does it cost?
+
+Validity is one question; price is the other, and a synthetic generator cannot answer it.
+`benchmark_massive.py` fits a gate on half of MASSIVE intent and reports what it did to
+the **other** half — real utterances, real model, held out.
+
+```bash
+python research/conformal/benchmark_massive.py --per-lang 2500 --langs en
+python research/conformal/benchmark_massive.py --per-lang 900 --langs en,de,fr,es,hi
+```
+
+Results and the setup caveat live in [`BENCHMARKS.md`](../../BENCHMARKS.md#what-the-guarantee-costs-on-real-traffic).
+The short version: at 60% zero-shot accuracy on a 20-way task, a 10% risk budget buys 40%
+of English traffic and a 5% budget is **not certifiable at all** — the gate abstains and
+says so rather than returning a threshold that buys nothing. Every certifiable row held on
+data the gate had never seen.
+
+Raw output is committed as `massive_en_results.json` and `massive_results.json`.
+
 ## What this does not establish
 
 The synthetic generator draws each row independently. Exchangeability is the one

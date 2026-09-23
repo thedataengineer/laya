@@ -226,6 +226,72 @@ Across all 21 configurations tested — four risk budgets, three calibration reg
 guardrail prevalences, `selective` and `miss` — every one holds inside its `delta` budget.
 Reproduce with `python research/conformal/validate_risk.py`.
 
+### What the guarantee costs on real traffic
+
+The table above validates the *bound*. It is synthetic on purpose — validity must not
+depend on the generator. This is the other question, and the one a buyer asks first: what
+does a risk budget cost in traffic you can actually auto-handle?
+
+`research/conformal/benchmark_massive.py` scores MASSIVE intent, fits a gate on half, and
+reports what it did to the **other** half. A coverage curve measured on the calibration
+split is a description of that split, not a forecast.
+
+**Read the setup before the numbers.** This uses the 20 most frequent intents as one
+**fixed** taxonomy, keeping the rows whose gold label falls in it. The accuracy harness in
+`research/eval/` instead draws gold + 19 random distractors per case. Both are 20-way, but
+a fixed taxonomy of the most frequent — and therefore most confusable — intents is the
+harder task, and it is the one a gate can be fitted to at all: a gate is valid only for
+the question it was calibrated on, so options that move per row are not gateable. The
+accuracy below is consequently lower than the per-language tables above, and is not a
+restatement of them.
+
+English, `laya` checkpoint, 2,031 cases, 1,015 calibration / 1,016 held out, zero-shot.
+Ungated accuracy **0.604**:
+
+| alpha | threshold | traffic kept | held-out joint risk | error among kept | within budget |
+|---|---|---|---|---|---|
+| 0.01 | — | 0% | — | — | **not certifiable** |
+| 0.02 | — | 0% | — | — | **not certifiable** |
+| 0.05 | — | 0% | — | — | **not certifiable** |
+| 0.10 | 1.000 | 40.4% | 0.0325 | 0.081 | yes |
+| 0.20 | 0.960 | 71.8% | 0.1752 | 0.244 | yes |
+
+Five languages mixed (en, de, fr, es, hi), router picking checkpoints per request, 4,500
+cases, ungated accuracy **0.493**:
+
+| alpha | threshold | traffic kept | held-out joint risk | error among kept | within budget |
+|---|---|---|---|---|---|
+| 0.01 | — | 0% | — | — | **not certifiable** |
+| 0.02 | — | 0% | — | — | **not certifiable** |
+| 0.05 | 1.000 | 16.5% | 0.0236 | 0.143 | yes |
+| 0.10 | 0.995 | 37.0% | 0.0964 | 0.261 | yes |
+| 0.20 | 0.940 | 57.0% | 0.1871 | 0.328 | yes |
+
+Three things in those tables are worth saying out loud.
+
+**The "not certifiable" rows are the most useful ones.** On a zero-shot 20-way task at 60%
+accuracy, no threshold in the grid holds the accepted-and-wrong rate under 5%. The gate
+does not return a threshold anyway. It abstains, sets `certifiable: False`, and names the
+shortfall. Every competing approach in this space would happily hand back a cutoff here,
+and the caller would have no way to know it bought nothing.
+
+**Every certifiable row holds on data the gate never saw.** 0.0325 against a 0.10 budget,
+0.0236 against 0.05, 0.1752 against 0.20. Conservative, as an exact binomial bound should
+be at these sample sizes.
+
+**Coverage is what a weak model costs you, and it is visible.** A 10% budget buys 40% of
+English traffic at 60% accuracy. Fine-tune the checkpoint on your domain — which is what
+the [Fine-Tuning](README.md#fine-tuning) section is for — and the same guarantee buys far
+more. That is the honest shape of the trade, and the gate makes it a number instead of an
+argument.
+
+Reproduce:
+
+```bash
+python research/conformal/benchmark_massive.py --per-lang 2500 --langs en
+python research/conformal/benchmark_massive.py --per-lang 900 --langs en,de,fr,es,hi
+```
+
 ### Option-order robustness
 
 How often the answer changes when the options are permuted. Jev measured at 0.13.
